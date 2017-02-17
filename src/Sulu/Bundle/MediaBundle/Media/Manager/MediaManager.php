@@ -293,7 +293,7 @@ class MediaManager implements MediaManagerInterface
      */
     private function getProperties(UploadedFile $uploadedFile)
     {
-        $mimeType = $uploadedFile->getMimeType();
+        $mimeType = $this->getMimeTypeOfUploadedFile($uploadedFile);
         $properties = [];
 
         try {
@@ -357,7 +357,7 @@ class MediaManager implements MediaManagerInterface
             // new uploaded file
             ++$version;
             $this->validator->validate($uploadedFile);
-            $type = $this->typeManager->getMediaType($uploadedFile->getMimeType());
+            $type = $this->typeManager->getMediaType($this->getMimeTypeOfUploadedFile($uploadedFile));
             if ($type !== $mediaEntity->getType()->getId()) {
                 throw new InvalidMediaTypeException('New media version must have the same media type.');
             }
@@ -370,7 +370,7 @@ class MediaManager implements MediaManagerInterface
             );
             $data['name'] = $uploadedFile->getClientOriginalName();
             $data['size'] = intval($uploadedFile->getSize());
-            $data['mimeType'] = $uploadedFile->getMimeType();
+            $data['mimeType'] = $this->getMimeTypeOfUploadedFile($uploadedFile);
             $data['properties'] = $this->getProperties($uploadedFile);
             $data['type'] = [
                 'id' => $type,
@@ -462,10 +462,10 @@ class MediaManager implements MediaManagerInterface
 
         $data['name'] = $uploadedFile->getClientOriginalName();
         $data['size'] = $uploadedFile->getSize();
-        $data['mimeType'] = $uploadedFile->getMimeType();
+        $data['mimeType'] = $this->getMimeTypeOfUploadedFile($uploadedFile);
         $data['properties'] = $this->getProperties($uploadedFile);
         $data['type'] = [
-            'id' => $this->typeManager->getMediaType($uploadedFile->getMimeType()),
+            'id' => $this->typeManager->getMediaType($this->getMimeTypeOfUploadedFile($uploadedFile)),
         ];
 
         return $this->createMedia($data, $user);
@@ -908,5 +908,28 @@ class MediaManager implements MediaManagerInterface
         }
 
         return $fileName;
+    }
+
+    /**
+     * @param UploadedFile $uploadedFile
+     * @return null|string
+     * @throws \Exception
+     */
+    private function getMimeTypeOfUploadedFile(UploadedFile $uploadedFile)
+    {
+        try
+        {
+            $mimeType = $uploadedFile->getMimeType();
+            return $mimeType;
+        }
+        catch (\LogicException $logicException)
+        {
+            $mimeType = $uploadedFile->getClientMimeType();
+            return $mimeType;
+        }
+        catch (\Exception $e)
+        {
+            throw $e;
+        }
     }
 }
