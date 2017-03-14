@@ -1,6 +1,7 @@
 CHANGELOG for Sulu
 ==================
 
+
 * dev-master
     * HOTFIX      #3282 [ContentBundle]         Fixed teaser-selection locale
 
@@ -17,6 +18,9 @@ CHANGELOG for Sulu
     * HOTFIX      #3261 [Webspace]              Fixed domain match for country specific domains
     * HOTFIX      #3262 [WebsiteBundle]         Fixed seo caninical tag with shadow.
     * HOTFIX      #3254 [RouteBundle]           Fixed detect localization in admin
+
+* dev-develop
+    * ENHANCEMENT #3154 [All]                 Upgrade symfony to ^3.0
 
 * 1.5.0 (2017-03-06)
     * BUGFIX      #3242 [ContentBundle]       Fixed set default author to creator contact-id
