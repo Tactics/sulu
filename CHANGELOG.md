@@ -1,7 +1,6 @@
 CHANGELOG for Sulu
 ==================
 
-
 * dev-master
     * HOTFIX      #3282 [ContentBundle]         Fixed teaser-selection locale
 
@@ -12,6 +11,9 @@ CHANGELOG for Sulu
     * HOTFIX      #3270 [Webspace]              Removed localization usage check in webspace's xml files
     * HOTFIX      #3263 [SearchBundle]          Escape search terms
     * HOTFIX      #3271 [MarkupBundle]          Fix request format in MarkupBundle listener
+* dev-develop
+    * ENHANCEMENT #3154 [All]                 Upgrade symfony to ^3.0
+    * ENHANCEMENT #3266 [ContentBundle]         Added locale parameter to teaser-selection-list
 
 * 1.5.1 (2017-03-16)
     * ENHANCEMENT #3256 [DocumentManagerBundle] Added VersionNotFoundException to fos_rest configuration
