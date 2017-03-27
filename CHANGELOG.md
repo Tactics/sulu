@@ -3,6 +3,11 @@ CHANGELOG for Sulu
 
 * dev-master
     * HOTFIX      #3282 [ContentBundle]         Fixed teaser-selection locale
+* dev-develop
+    * ENHANCEMENT #3266 [ContentBundle]         Added locale parameter to teaser-selection-list
+    * FEATURE     #3278 [Util]                  Changed way to determine `sulu.version` to composer.lock
+    * FEATURE     #3278 [Util]                  Introduced new parameter `app.version` read from composer.json
+    * ENHANCEMENT #3154 [All]                   Upgrade symfony to ^3.0
 
 * 1.5.2 (2017-03-22)
     * HOTFIX      #3265 [ContentBundle]         Fixed internal-link selection for pages
