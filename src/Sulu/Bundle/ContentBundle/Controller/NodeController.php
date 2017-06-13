@@ -640,6 +640,24 @@ class NodeController extends RestController implements ClassResourceInterface, S
         $this->handleActionParameter($action, $document, $language);
         $this->getDocumentManager()->flush();
 
+        $node = $document;
+        $permissions = array();
+
+        /** TODO move logic to subscriber ? */
+        if(method_exists($node, 'getPermissions'))
+        {
+          while($node->getPermissions() == array() && method_exists($node, 'getParent') &&  $node->getParent() != null)
+          {
+            $node = $node->getParent();
+            if(! empty($node->getPermissions()))
+              $permissions = $node->getPermissions();
+          }
+
+          $document->setPermissions($permissions);
+          $this->getDocumentManager()->persist($document);
+          $this->getDocumentManager()->flush();
+        }
+
         $view = $this->view($document);
         $view->setSerializationContext(
             SerializationContext::create()->setSerializeNull(true)->setGroups(['defaultPage'])

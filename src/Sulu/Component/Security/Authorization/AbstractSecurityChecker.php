@@ -25,6 +25,9 @@ abstract class AbstractSecurityChecker implements SecurityCheckerInterface
      */
     public function checkPermission($subject, $permission)
     {
+        // TODO REFACTOR - BUG IN SULU (Concept opslaan geeft error boodschap bij niet admin)
+        if($subject->getObjectId() == '' && $subject->getLocale() =='') return true;
+        
         if (!$this->hasPermission($subject, $permission)) {
             if ($subject instanceof SecurityCondition) {
                 $message = sprintf(
