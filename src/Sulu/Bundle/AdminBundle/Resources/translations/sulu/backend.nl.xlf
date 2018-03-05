@@ -452,7 +452,7 @@
             </trans-unit>
             <trans-unit id="d5f4a99d54bb05a92a78146053c828d9" resname="sulu.overlay.delete-desc">
                 <source>sulu.overlay.delete-desc</source>
-                <target>Deze actie verwijderd data en kan niet ongedaan gemaakt worden. Weet je zeker dat je door wilt gaan?</target>
+                <target>Deze actie verwijdert data en kan niet ongedaan gemaakt worden. Weet je zeker dat je door wilt gaan?</target>
             </trans-unit>
             <trans-unit id="d5f4a99d54bb05a92a781460534528d9" resname="sulu.overlay.unsaved-changes-confirm">
                 <source>sulu.overlay.unsaved-changes-confirm</source>
