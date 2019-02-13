@@ -34,13 +34,25 @@
                 <source>snippet.delete-confirm-text</source>
                 <target>Etes-vous sûr que vous voulez le retirer?</target>
             </trans-unit>
+            <trans-unit id="10a" resname="snippet.save-confirm-text">
+                <source>snippet.save-confirm-text</source>
+                <target>Ce fragment est configuré par défaut pour un espace web. En modifiant le type, il ne sera plus configuré par défaut</target>
+            </trans-unit>
             <trans-unit id="11" resname="snippet.delete-confirm-title">
                 <source>snippet.delete-confirm-title</source>
                 <target>Confirmation de la suppression</target>
             </trans-unit>
+            <trans-unit id="11a" resname="snippet.save-confirm-title">
+                <source>snippet.save-confirm-title</source>
+                <target>Confirmez le changement de type</target>
+            </trans-unit>
             <trans-unit id="12" resname="snippet.delete-do-it">
                 <source>snippet.delete-do-it</source>
                 <target>Oui, je suis sûr</target>
+            </trans-unit>
+            <trans-unit id="12a" resname="snippet.save-do-it">
+                <source>snippet.save-do-it</source>
+                <target>Modifier</target>
             </trans-unit>
             <trans-unit id="13" resname="snippet.delete-no-snippets-selected">
                 <source>snippet.delete-no-snippets-selected</source>
@@ -85,6 +97,10 @@
             <trans-unit id="26" resname="snippet.settings.copy-locale-overlay.info">
                 <source>snippet.settings.copy-locale-overlay.info</source>
                 <target> Un fragment nouveau est établi </target>
+            </trans-unit>
+            <trans-unit id="27" resname="content-navigation.snippets.taxonomies">
+                <source>content-navigation.snippets.excerpt</source>
+                <target>Taxonomies</target>
             </trans-unit>
         </body>
     </file>

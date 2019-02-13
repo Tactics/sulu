@@ -33,10 +33,6 @@ class PortalInformationRequestProcessor implements RequestProcessorInterface
 
         $attributes = ['requestUri' => $request->getUri()];
 
-        if (null !== $localization = $portalInformation->getLocalization()) {
-            $request->setLocale($localization->getLocale());
-        }
-
         $attributes['portalInformation'] = $portalInformation;
 
         $attributes['getParameter'] = $request->query->all();
@@ -50,27 +46,34 @@ class PortalInformationRequestProcessor implements RequestProcessorInterface
         $attributes['webspace'] = $portalInformation->getWebspace();
         $attributes['portal'] = $portalInformation->getPortal();
 
-        if ($portalInformation->getType() === RequestAnalyzerInterface::MATCH_TYPE_REDIRECT) {
+        if (RequestAnalyzerInterface::MATCH_TYPE_REDIRECT === $portalInformation->getType()) {
             return new RequestAttributes($attributes);
         }
 
         $attributes['localization'] = $portalInformation->getLocalization();
+
+        if (!$attributes['localization'] && $portalInformation->getPortal()) {
+            $attributes['localization'] = $portalInformation->getPortal()->getDefaultLocalization();
+        }
+
         if ($attributes['localization']) {
             $attributes['locale'] = $attributes['localization']->getLocale();
+            $request->setLocale($attributes['locale']);
         }
 
         $attributes['segment'] = $portalInformation->getSegment();
 
         list($resourceLocator, $format) = $this->getResourceLocatorFromRequest(
             $portalInformation,
-            $request
+            $request,
+            $requestAttributes->getAttribute('path')
         );
 
         $attributes['urlExpression'] = $portalInformation->getUrlExpression();
         $attributes['resourceLocator'] = $resourceLocator;
         $attributes['format'] = $format;
 
-        $attributes['resourceLocatorPrefix'] = substr($portalInformation->getUrl(), strlen($request->getHttpHost()));
+        $attributes['resourceLocatorPrefix'] = substr($portalInformation->getUrl(), strlen($request->getHost()));
 
         if (null !== $format) {
             $request->setRequestFormat($format);
@@ -92,13 +95,12 @@ class PortalInformationRequestProcessor implements RequestProcessorInterface
      *
      * @param PortalInformation $portalInformation
      * @param Request $request
+     * @param string $path
      *
      * @return array
      */
-    private function getResourceLocatorFromRequest(PortalInformation $portalInformation, Request $request)
+    private function getResourceLocatorFromRequest(PortalInformation $portalInformation, Request $request, $path)
     {
-        $path = $request->getPathInfo();
-
         // extract file and extension info
         $pathParts = explode('/', $path);
         $fileInfo = explode('.', array_pop($pathParts));
@@ -110,7 +112,7 @@ class PortalInformationRequestProcessor implements RequestProcessorInterface
         }
 
         $resourceLocator = substr(
-            $request->getHttpHost() . $path,
+            $request->getHost() . $path,
             strlen($portalInformation->getUrl())
         );
 

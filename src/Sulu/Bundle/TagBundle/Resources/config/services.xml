@@ -23,7 +23,7 @@
             <argument>%sulu_tag.entity.tag%</argument>
         </service>
         <service id="sulu_tag.tag_manager" class="%sulu_tag.tag_manager.class%">
-            <argument type="service" id="sulu_tag.tag_repository"/>
+            <argument type="service" id="sulu.repository.tag"/>
             <argument type="service" id="sulu.repository.user"/>
             <argument type="service" id="doctrine.orm.entity_manager"/>
             <argument type="service" id="event_dispatcher"/>
@@ -54,5 +54,8 @@
             <tag name="massive_search.converter" from="tags"/>
         </service>
 
+        <service id="sulu_tag.reference_store.tag" class="Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStore">
+            <tag name="sulu_website.reference_store" alias="tag"/>
+        </service>
     </services>
 </container>

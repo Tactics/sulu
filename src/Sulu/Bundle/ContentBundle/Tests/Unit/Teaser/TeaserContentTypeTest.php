@@ -16,6 +16,9 @@ use Sulu\Bundle\ContentBundle\Teaser\Provider\TeaserProviderPoolInterface;
 use Sulu\Bundle\ContentBundle\Teaser\Teaser;
 use Sulu\Bundle\ContentBundle\Teaser\TeaserContentType;
 use Sulu\Bundle\ContentBundle\Teaser\TeaserManagerInterface;
+use Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStoreInterface;
+use Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStoreNotExistsException;
+use Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStorePoolInterface;
 use Sulu\Component\Content\Compat\PropertyInterface;
 use Sulu\Component\Content\Compat\PropertyParameter;
 use Sulu\Component\Content\Compat\StructureInterface;
@@ -38,6 +41,16 @@ class TeaserContentTypeTest extends \PHPUnit_Framework_TestCase
     private $teaserManager;
 
     /**
+     * @var ReferenceStorePoolInterface
+     */
+    private $referenceStorePool;
+
+    /**
+     * @var ReferenceStoreInterface
+     */
+    private $mediaReferenceStore;
+
+    /**
      * @var TeaserContentType
      */
     private $contentType;
@@ -46,11 +59,16 @@ class TeaserContentTypeTest extends \PHPUnit_Framework_TestCase
     {
         $this->teaserProviderPool = $this->prophesize(TeaserProviderPoolInterface::class);
         $this->teaserManager = $this->prophesize(TeaserManagerInterface::class);
+        $this->referenceStorePool = $this->prophesize(ReferenceStorePoolInterface::class);
+        $this->mediaReferenceStore = $this->prophesize(ReferenceStoreInterface::class);
+
+        $this->referenceStorePool->getStore('media')->willReturn($this->mediaReferenceStore->reveal());
 
         $this->contentType = new TeaserContentType(
             $this->template,
             $this->teaserProviderPool->reveal(),
-            $this->teaserManager->reveal()
+            $this->teaserManager->reveal(),
+            $this->referenceStorePool->reveal()
         );
     }
 
@@ -83,13 +101,17 @@ class TeaserContentTypeTest extends \PHPUnit_Framework_TestCase
 
     public function testGetContentData()
     {
-        $items = [['type' => 'content', 'id' => '123-123-123'], ['type' => 'media', 'id' => 1]];
+        $items = [
+            ['type' => 'content', 'id' => '123-123-123', 'mediaId' => 15],
+            ['type' => 'media', 'id' => 1, 'mediaId' => null],
+        ];
 
         $teasers = array_map(
             function ($item) {
                 $teaser = $this->prophesize(Teaser::class);
                 $teaser->getType()->willReturn($item['type']);
                 $teaser->getId()->willReturn($item['id']);
+                $teaser->getMediaId()->willReturn($item['mediaId']);
 
                 return $teaser->reveal();
             },
@@ -102,6 +124,8 @@ class TeaserContentTypeTest extends \PHPUnit_Framework_TestCase
         $property = $this->prophesize(PropertyInterface::class);
         $property->getValue()->willReturn(['items' => $items]);
         $property->getStructure()->willReturn($structure);
+
+        $this->mediaReferenceStore->add(15);
 
         $this->teaserManager->find($items, 'de')->shouldBeCalled()->willReturn($teasers);
 
@@ -128,5 +152,34 @@ class TeaserContentTypeTest extends \PHPUnit_Framework_TestCase
             ['items' => [], 'presentAs' => null],
             $this->contentType->getViewData($property->reveal())
         );
+    }
+
+    public function testPreResolve()
+    {
+        $data = [
+            'items' => [
+                ['type' => 'article', 'id' => 1],
+                ['type' => 'test', 'id' => 2],
+                ['type' => 'content', 'id' => 3],
+            ],
+        ];
+
+        $articleStore = $this->prophesize(ReferenceStoreInterface::class);
+        $contentStore = $this->prophesize(ReferenceStoreInterface::class);
+
+        $this->referenceStorePool->getStore('article')->willReturn($articleStore->reveal());
+        $this->referenceStorePool->getStore('content')->willReturn($contentStore->reveal());
+        $this->referenceStorePool->getStore('test')
+            ->willThrow(
+                new ReferenceStoreNotExistsException('test', ['article', 'content'])
+            );
+
+        $property = $this->prophesize(PropertyInterface::class);
+        $property->getValue()->willReturn($data);
+
+        $this->contentType->preResolve($property->reveal());
+
+        $articleStore->add(1)->shouldBeCalled();
+        $contentStore->add(3)->shouldBeCalled();
     }
 }

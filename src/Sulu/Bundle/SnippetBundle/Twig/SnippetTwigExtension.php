@@ -64,8 +64,8 @@ class SnippetTwigExtension extends \Twig_Extension implements SnippetTwigExtensi
      */
     public function loadSnippet($uuid, $locale = null)
     {
-        if ($locale === null) {
-            $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocalization();
+        if (null === $locale) {
+            $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocale();
         }
 
         try {

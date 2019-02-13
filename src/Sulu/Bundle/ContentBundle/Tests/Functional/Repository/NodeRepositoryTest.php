@@ -122,8 +122,9 @@ class NodeRepositoryTest extends SuluTestCase
     {
         $result = $this->nodeRepository->getWebspaceNodes('en');
 
-        $this->assertEquals('Sulu CMF', $result['_embedded']['nodes'][0]['title']);
-        $this->assertEquals('Test CMF', $result['_embedded']['nodes'][1]['title']);
+        $this->assertEquals('Destination CMF', $result['_embedded']['nodes'][0]['title']);
+        $this->assertEquals('Sulu CMF', $result['_embedded']['nodes'][1]['title']);
+        $this->assertEquals('Test CMF', $result['_embedded']['nodes'][2]['title']);
     }
 
     /**
@@ -542,7 +543,7 @@ class NodeRepositoryTest extends SuluTestCase
             $document->setShadowLocaleEnabled($isShadow);
         }
 
-        if ($state === null) {
+        if (null === $state) {
             $state = WorkflowStage::TEST;
         }
         $document->setWorkflowStage($state);
@@ -583,7 +584,7 @@ class NodeRepositoryTest extends SuluTestCase
         }
 
         $this->documentManager->persist($document, $locale, $persistOptions);
-        if ($state === WorkflowStage::PUBLISHED) {
+        if (WorkflowStage::PUBLISHED === $state) {
             $this->documentManager->publish($document, $locale);
         }
         $this->documentManager->flush();

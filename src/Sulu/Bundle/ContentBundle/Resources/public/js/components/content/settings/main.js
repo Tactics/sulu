@@ -49,82 +49,43 @@ define([
             }
         },
 
-        authorFullname = null,
-
         isShadow = function() {
             return this.sandbox.dom.prop('#shadow_on_checkbox', 'checked');
         },
 
         setCreationChangelog = function(fullName, time) {
-            var creationText, formattedTime = this.sandbox.date.format(time, true);
-
-            if (!!fullName) {
-                creationText = this.sandbox.util.sprintf(
-                    this.sandbox.translate('sulu.content.form.settings.changelog.created'),
-                    {
-                        creator: fullName,
-                        created: formattedTime
-                    }
-                );
-            } else {
-                creationText = this.sandbox.util.sprintf(
-                    this.sandbox.translate('sulu.content.form.settings.changelog.created-only'),
-                    {
-                        created: formattedTime
-                    }
-                )
-            }
-
-            this.sandbox.dom.text('#created', creationText);
+            setChangelog.call(this, '#created', 'created', fullName, time, 'creator', 'created');
         },
 
         setChangeChangelog = function(fullName, time) {
-            var changedText, formattedTime = this.sandbox.date.format(time, true);
-
-            if (!!fullName) {
-                changedText = this.sandbox.util.sprintf(
-                    this.sandbox.translate('sulu.content.form.settings.changelog.changed'),
-                    {
-                        changer: fullName,
-                        changed: formattedTime
-                    }
-                );
-            } else {
-                changedText = this.sandbox.util.sprintf(
-                    this.sandbox.translate('sulu.content.form.settings.changelog.changed-only'),
-                    {
-                        changed: formattedTime
-                    }
-                )
-            }
-
-            this.sandbox.dom.text('#changed', changedText);
+            setChangelog.call(this, '#changed', 'changed', fullName, time, 'changer', 'changed');
         },
 
         setAuthorChangelog = function(fullName, time) {
-            var authoredText, formattedTime = this.sandbox.date.format(time);
+            setChangelog.call(this, '#author', 'authored', fullName, time, 'author', 'authored');
+        },
 
-            fullName = fullName || authorFullname;
+        setChangelog = function(selector, type, fullName, time, nameTranslationPlaceholder, timeTranslationPlaceholder) {
+            var changeLogText,
+                translations = {},
+                formattedTime = this.sandbox.date.format(time, true);
+
+            translations[nameTranslationPlaceholder] = fullName;
+            translations[timeTranslationPlaceholder] = formattedTime;
 
             if (!!fullName) {
-                authorFullname = fullName;
-                authoredText = this.sandbox.util.sprintf(
-                    this.sandbox.translate('sulu.content.form.settings.changelog.authored'),
-                    {
-                        author: fullName,
-                        authored: formattedTime
-                    }
+                changeLogText = this.sandbox.util.sprintf(
+                    this.sandbox.translate('sulu.content.form.settings.changelog.' + type),
+                    translations
                 );
             } else {
-                authoredText = this.sandbox.util.sprintf(
-                    this.sandbox.translate('sulu.content.form.settings.changelog.authored-only'),
-                    {
-                        authored: formattedTime
-                    }
+                changeLogText = this.sandbox.util.sprintf(
+                    this.sandbox.translate('sulu.content.form.settings.changelog.' + type + '-only'),
+                    translations
                 )
             }
 
-            this.sandbox.dom.text('#author', authoredText);
+            this.sandbox.dom.text(selector, changeLogText);
         },
 
         showChangelogContainer = function() {
@@ -456,15 +417,15 @@ define([
                     global: false,
 
                     success: function(model) {
-                        authorDef.resolve(model.get('fullName'), new Date(data.authored));
+                        authorDef.resolve(model.get('fullName'), data.authored);
                     }.bind(this),
 
                     error: function() {
-                        authorDef.resolve(null, new Date(data.authored));
+                        authorDef.resolve(null, data.authored);
                     }.bind(this)
                 });
             } else {
-                authorDef.resolve(null, new Date(data.authored));
+                authorDef.resolve(null, data.authored);
             }
 
             this.sandbox.data.when(creatorDef, changerDef, authorDef).then(function(creation, change, author) {
@@ -714,6 +675,7 @@ define([
                             el: $componentContainer,
                             locale: this.options.locale,
                             data: {author: this.data.author, authored: this.data.authored},
+                            nullableAuthor: !Config.get('sulu-content').defaultAuthor,
                             selectCallback: function(data) {
                                 this.setAuthor(data);
 
@@ -729,14 +691,13 @@ define([
             this.setHeaderBar(false);
 
             this.data.authored = data.authored;
+            this.data.author = data.author;
             if (!data.authorItem) {
-                setAuthorChangelog.call(this, null, new Date(data.authored));
-
+                setAuthorChangelog.call(this, null, data.authored);
                 return;
             }
 
-            setAuthorChangelog.call(this, data.authorItem.firstName + ' ' + data.authorItem.lastName, new Date(data.authored));
-            this.data.author = data.author;
+            setAuthorChangelog.call(this, data.authorItem.firstName + ' ' + data.authorItem.lastName, data.authored);
         }
     };
 });

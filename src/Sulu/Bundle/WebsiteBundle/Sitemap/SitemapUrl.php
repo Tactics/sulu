@@ -20,11 +20,17 @@ class SitemapUrl
      * Constants which indicates the change frequency (google will use them).
      */
     const CHANGE_FREQUENCY_ALWAYS = 'always';
+
     const CHANGE_FREQUENCY_HOURLY = 'hourly';
+
     const CHANGE_FREQUENCY_DAILY = 'daily';
+
     const CHANGE_FREQUENCY_WEEKLY = 'weekly';
+
     const CHANGE_FREQUENCY_MONTHLY = 'monthly';
+
     const CHANGE_FREQUENCY_YEARLY = 'yearly';
+
     const CHANGE_FREQUENCY_NEVER = 'never';
 
     /**
@@ -33,6 +39,11 @@ class SitemapUrl
      * @var string
      */
     private $loc;
+
+    /**
+     * @var string
+     */
+    private $locale;
 
     /**
      * Datetime of last modification.
@@ -63,17 +74,33 @@ class SitemapUrl
     private $alternateLinks;
 
     /**
+     * @var array
+     */
+    private $attributes;
+
+    /**
      * @param string $loc
      * @param \DateTime $lastmod
      * @param string $changefreq
      * @param float $priority
+     * @param array $attributes
      */
-    public function __construct($loc, \DateTime $lastmod = null, $changefreq = null, $priority = null)
-    {
+    public function __construct(
+        $loc,
+        $locale,
+        \DateTime $lastmod = null,
+        $changefreq = null,
+        $priority = null,
+        $attributes = []
+    ) {
         $this->loc = $loc;
+        $this->locale = $locale;
         $this->lastmod = $lastmod;
         $this->changefreq = $changefreq;
         $this->priority = $priority;
+        $this->attributes = $attributes;
+
+        $this->addAlternateLink(new SitemapAlternateLink($loc, $locale));
     }
 
     /**
@@ -84,6 +111,16 @@ class SitemapUrl
     public function getLoc()
     {
         return $this->loc;
+    }
+
+    /**
+     * Returns locale.
+     *
+     * @return string
+     */
+    public function getLocale()
+    {
+        return $this->locale;
     }
 
     /**
@@ -135,8 +172,18 @@ class SitemapUrl
      */
     public function addAlternateLink(SitemapAlternateLink $alternateLink)
     {
-        $this->alternateLinks[] = $alternateLink;
+        $this->alternateLinks[$alternateLink->getLocale()] = $alternateLink;
 
         return $this;
+    }
+
+    /**
+     * Additional attributes to render template.
+     *
+     * @return array
+     */
+    public function getAttributes()
+    {
+        return $this->attributes;
     }
 }

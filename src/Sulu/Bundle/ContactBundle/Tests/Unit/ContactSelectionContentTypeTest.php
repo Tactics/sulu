@@ -22,10 +22,10 @@ use Sulu\Bundle\ContactBundle\Contact\ContactManagerInterface;
 use Sulu\Bundle\ContactBundle\Content\Types\ContactSelectionContentType;
 use Sulu\Bundle\ContactBundle\Util\CustomerIdConverter;
 use Sulu\Bundle\ContactBundle\Util\IndexComparator;
+use Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStoreInterface;
 use Sulu\Component\Content\Compat\PropertyInterface;
 use Sulu\Component\Content\Compat\PropertyParameter;
 use Sulu\Component\Content\Compat\StructureInterface;
-use Sulu\Component\Content\ContentTypeInterface;
 
 class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
 {
@@ -84,6 +84,16 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
      */
     private $serializer;
 
+    /**
+     * @var ReferenceStoreInterface
+     */
+    private $accountReferenceStore;
+
+    /**
+     * @var ReferenceStoreInterface
+     */
+    private $contactReferenceStore;
+
     protected function setUp()
     {
         parent::setUp();
@@ -100,20 +110,8 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
         $this->property->getStructure()->willReturn($this->structure->reveal());
 
         $this->serializer = $this->prophesize(Serializer::class);
-    }
-
-    public function testGetType()
-    {
-        $type = new ContactSelectionContentType(
-            $this->template,
-            $this->contactManager->reveal(),
-            $this->accountManager->reveal(),
-            $this->serializer->reveal(),
-            new CustomerIdConverter(),
-            new IndexComparator()
-        );
-
-        $this->assertEquals(ContentTypeInterface::PRE_SAVE, $type->getType());
+        $this->accountReferenceStore = $this->prophesize(ReferenceStoreInterface::class);
+        $this->contactReferenceStore = $this->prophesize(ReferenceStoreInterface::class);
     }
 
     public function testGetTemplate()
@@ -124,7 +122,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $this->assertEquals($this->template, $type->getTemplate());
@@ -138,7 +138,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $this->property->getName()->willReturn('test');
@@ -163,7 +165,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $this->property->getName()->willReturn('test');
@@ -188,7 +192,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $this->property->getName()->willReturn('test');
@@ -213,7 +219,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $this->property->getName()->willReturn('test');
@@ -238,7 +246,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $this->property->getName()->willReturn('test');
@@ -264,7 +274,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $nodeProperty = $this->prophesize(\PHPCR\PropertyInterface::class);
@@ -295,7 +307,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $view = $type->getViewData($this->property->reveal());
@@ -311,7 +325,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $defaultValue = $type->getDefaultValue();
@@ -327,7 +343,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $defaultParams = $type->getDefaultParams();
@@ -349,7 +367,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $this->property->getName()->willReturn('test');
@@ -374,7 +394,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $contact1 = $this->prophesize(Contact::class);
@@ -415,7 +437,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $entity1 = $this->prophesize(Account::class);
@@ -456,7 +480,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $contact1 = $this->prophesize(Contact::class);
@@ -498,7 +524,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $this->property->getValue()->willReturn([]);
@@ -518,7 +546,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $this->property->getValue()->willReturn(null);
@@ -538,7 +568,9 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
             $this->accountManager->reveal(),
             $this->serializer->reveal(),
             new CustomerIdConverter(),
-            new IndexComparator()
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
         );
 
         $this->property->getValue()->willReturn('blabla');
@@ -548,5 +580,26 @@ class ContactSelectionContentTypeTest extends \PHPUnit_Framework_TestCase
         $result = $type->getContentData($this->property->reveal());
 
         $this->assertCount(0, $result);
+    }
+
+    public function testPreResolve()
+    {
+        $type = new ContactSelectionContentType(
+            $this->template,
+            $this->contactManager->reveal(),
+            $this->accountManager->reveal(),
+            $this->serializer->reveal(),
+            new CustomerIdConverter(),
+            new IndexComparator(),
+            $this->accountReferenceStore->reveal(),
+            $this->contactReferenceStore->reveal()
+        );
+
+        $this->property->getValue()->willReturn(['a1', 'c1', 'a3']);
+        $type->preResolve($this->property->reveal());
+
+        $this->accountReferenceStore->add(1)->shouldBeCalled();
+        $this->accountReferenceStore->add(3)->shouldBeCalled();
+        $this->contactReferenceStore->add(1)->shouldBeCalled();
     }
 }

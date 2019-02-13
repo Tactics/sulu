@@ -1436,6 +1436,26 @@ class ContentMapperTest extends SuluTestCase
 
         $this->assertEquals('Page-1', $result->title);
         $this->assertEquals('/page-1', $result->url);
+        $this->assertEquals(
+            [
+                'a' => 'That´s a test',
+                'b' => 'That´s a second test',
+            ],
+            $result->getExt()['test1']
+        );
+    }
+
+    public function testLanguageCopyPublishedDocument()
+    {
+        $data = $this->prepareSinglePageTestData(WorkflowStage::PUBLISHED);
+
+        $this->mapper->copyLanguage($data->getUuid(), 1, 'sulu_io', 'de', 'en');
+
+        $result = $this->mapper->load($data->getUuid(), 'sulu_io', 'en');
+
+        $this->assertEquals('Page-1', $result->title);
+        $this->assertEquals('/page-1', $result->url);
+        $this->assertNull($result->getPublished());
     }
 
     public function testMultipleLanguagesCopy()
@@ -1448,11 +1468,25 @@ class ContentMapperTest extends SuluTestCase
 
         $this->assertEquals('Page-1', $result->title);
         $this->assertEquals('/page-1', $result->url);
+        $this->assertEquals(
+            [
+                'a' => 'That´s a test',
+                'b' => 'That´s a second test',
+            ],
+            $result->getExt()['test1']
+        );
 
         $result = $this->mapper->load($data->getUuid(), 'sulu_io', 'de_at');
 
         $this->assertEquals('Page-1', $result->title);
         $this->assertEquals('/page-1', $result->url);
+        $this->assertEquals(
+            [
+                'a' => 'That´s a test',
+                'b' => 'That´s a second test',
+            ],
+            $result->getExt()['test1']
+        );
     }
 
     private function prepareCopyLanguageTree()
@@ -1956,14 +1990,20 @@ class ContentMapperTest extends SuluTestCase
         $this->assertEquals('Test', $structure3->getNodeName());
     }
 
-    private function prepareSinglePageTestData()
+    private function prepareSinglePageTestData($workflowStage = WorkflowStage::TEST)
     {
         $data = [
             'title' => 'Page-1',
             'url' => '/page-1',
+            'ext' => [
+                'test1' => [
+                    'a' => 'That´s a test',
+                    'b' => 'That´s a second test',
+                ],
+            ],
         ];
 
-        $data = $this->save($data, 'overview', 'sulu_io', 'de', 1);
+        $data = $this->save($data, 'overview', 'sulu_io', 'de', 1, true, null, null, $workflowStage);
 
         return $data;
     }
@@ -2633,7 +2673,7 @@ class ContentMapperTest extends SuluTestCase
         }
 
         $this->documentManager->persist($document, $locale, $persistOptions);
-        if ($state == WorkflowStage::PUBLISHED) {
+        if (WorkflowStage::PUBLISHED == $state) {
             $this->documentManager->publish($document, $locale);
         }
         $this->documentManager->flush();

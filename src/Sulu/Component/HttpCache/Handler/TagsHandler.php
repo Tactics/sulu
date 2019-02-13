@@ -12,22 +12,20 @@
 namespace Sulu\Component\HttpCache\Handler;
 
 use FOS\HttpCache\ProxyClient\ProxyClientInterface;
-use Sulu\Component\Content\Compat\PropertyInterface;
+use Ramsey\Uuid\Uuid;
+use Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStoreInterface;
+use Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStorePoolInterface;
 use Sulu\Component\Content\Compat\StructureInterface;
-use Sulu\Component\Content\ContentTypeManager;
-use Sulu\Component\Content\ContentTypeManagerInterface;
 use Sulu\Component\HttpCache\HandlerFlushInterface;
+use Sulu\Component\HttpCache\HandlerInvalidateReferenceInterface;
 use Sulu\Component\HttpCache\HandlerInvalidateStructureInterface;
 use Sulu\Component\HttpCache\HandlerUpdateResponseInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Invalidation service for Sulu structures.
+ * Invalidation service for sulu structures.
  */
-class TagsHandler implements
-    HandlerInvalidateStructureInterface,
-    HandlerUpdateResponseInterface,
-    HandlerFlushInterface
+class TagsHandler implements HandlerInvalidateStructureInterface, HandlerInvalidateReferenceInterface, HandlerUpdateResponseInterface, HandlerFlushInterface
 {
     const TAGS_HEADER = 'X-Cache-Tags';
 
@@ -37,62 +35,58 @@ class TagsHandler implements
     private $proxyClient;
 
     /**
-     * @var ContentTypeManager
+     * @var ReferenceStorePoolInterface
      */
-    private $contentTypeManager;
+    private $referenceStorePool;
 
     /**
      * @var array
      */
-    private $structuresToInvalidate;
+    private $referencesToInvalidate = [];
 
     /**
      * @param ProxyClientInterface $proxyClient
-     * @param ContentTypeManagerInterface $contentTypeManager
+     * @param ReferenceStorePoolInterface $referenceStorePool
      */
-    public function __construct(
-        ProxyClientInterface $proxyClient,
-        ContentTypeManagerInterface $contentTypeManager
-    ) {
+    public function __construct(ProxyClientInterface $proxyClient, ReferenceStorePoolInterface $referenceStorePool)
+    {
         $this->proxyClient = $proxyClient;
-        $this->contentTypeManager = $contentTypeManager;
+        $this->referenceStorePool = $referenceStorePool;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function invalidateStructure(StructureInterface $structure)
     {
-        $this->structuresToInvalidate[$structure->getUuid()] = $structure;
+        $this->referencesToInvalidate[] = $structure->getUuid();
     }
 
-    public function updateResponse(Response $response, StructureInterface $structure)
+    /**
+     * {@inheritdoc}
+     */
+    public function invalidateReference($alias, $id)
     {
-        $tags = [
-            $this->getBanKey($structure->getUuid()),
-        ];
-
-        foreach ($structure->getProperties(true) as $property) {
-            foreach ($this->getReferencedUuids($property) as $uuid) {
-                $tags[] = $this->getBanKey($uuid);
-            }
+        $reference = $id;
+        if (!Uuid::isValid($id)) {
+            $reference = sprintf('%s-%s', $alias, $id);
         }
 
-        $response->headers->set(
-            self::TAGS_HEADER,
-            implode(',', $tags)
-        );
+        if (in_array($reference, $this->referencesToInvalidate)) {
+            return;
+        }
+
+        $this->referencesToInvalidate[] = $reference;
     }
 
-    private function getReferencedUuids(PropertyInterface $property)
+    /**
+     * {@inheritdoc}
+     */
+    public function updateResponse(Response $response, StructureInterface $structure)
     {
-        $contentTypeName = $property->getContentTypeName();
-        $contentType = $this->contentTypeManager->get($contentTypeName);
-        $referencedUuids = $contentType->getReferencedUuids($property);
+        $tags = array_merge([$structure->getUuid()], $this->getTags());
 
-        return $referencedUuids;
-    }
-
-    private function getBanKey($uuid)
-    {
-        return 'structure-' . $uuid;
+        $response->headers->set(self::TAGS_HEADER, implode(',', $tags));
     }
 
     /**
@@ -100,20 +94,59 @@ class TagsHandler implements
      */
     public function flush()
     {
-        if (!$this->structuresToInvalidate) {
+        if (0 === count($this->referencesToInvalidate)) {
             return false;
         }
 
-        foreach ($this->structuresToInvalidate as $structure) {
-            $banKey = $this->getBanKey($structure->getUuid());
-
-            $this->proxyClient->ban([
-                self::TAGS_HEADER => sprintf('(%s)(,.+)?$', preg_quote($banKey)),
-            ]);
+        foreach ($this->referencesToInvalidate as $reference) {
+            $this->proxyClient->ban(
+                [
+                    self::TAGS_HEADER => sprintf('(%s)(,.+)?$', preg_quote($reference)),
+                ]
+            );
         }
 
         $this->proxyClient->flush();
+        $this->referencesToInvalidate = [];
 
         return true;
+    }
+
+    /**
+     * Merges tags from all registered stores.
+     *
+     * @return array
+     */
+    private function getTags()
+    {
+        $tags = [];
+        foreach ($this->referenceStorePool->getStores() as $alias => $referenceStore) {
+            $tags = array_merge($tags, $this->getTagsFromStore($alias, $referenceStore));
+        }
+
+        return $tags;
+    }
+
+    /**
+     * Returns tags from given store.
+     *
+     * @param string $alias
+     * @param ReferenceStoreInterface $referenceStore
+     *
+     * @return array
+     */
+    private function getTagsFromStore($alias, ReferenceStoreInterface $referenceStore)
+    {
+        $tags = [];
+        foreach ($referenceStore->getAll() as $reference) {
+            $tag = $reference;
+            if (!Uuid::isValid($reference)) {
+                $tag = $alias . '-' . $reference;
+            }
+
+            $tags[] = $tag;
+        }
+
+        return $tags;
     }
 }

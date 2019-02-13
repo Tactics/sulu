@@ -12,31 +12,32 @@
 namespace Sulu\Bundle\SecurityBundle\Controller;
 
 use Doctrine\ORM\NoResultException;
+use Sulu\Bundle\SecurityBundle\Exception\UserNotInSystemException;
+use Sulu\Bundle\SecurityBundle\Security\Exception\EmailTemplateException;
 use Sulu\Bundle\SecurityBundle\Security\Exception\InvalidTokenException;
 use Sulu\Bundle\SecurityBundle\Security\Exception\MissingPasswordException;
 use Sulu\Bundle\SecurityBundle\Security\Exception\NoTokenFoundException;
 use Sulu\Bundle\SecurityBundle\Security\Exception\TokenAlreadyRequestedException;
 use Sulu\Bundle\SecurityBundle\Security\Exception\TokenEmailsLimitReachedException;
 use Sulu\Component\Rest\Exception\EntityNotFoundException;
+use Sulu\Component\Security\Authentication\UserInterface as SuluUserInterface;
 use Sulu\Component\Security\Authentication\UserRepositoryInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Event\InteractiveLoginEvent;
 use Symfony\Component\Translation\Translator;
+use Symfony\Component\Validator\Constraints\Email as EmailConstraint;
 
 /**
  * Class ResettingController.
  */
 class ResettingController extends Controller
 {
-    protected static $emailSubjectKey = 'security.reset.mail-subject';
-    protected static $emailMessageKey = 'security.reset.mail-message';
-    protected static $translationDomain = 'backend';
     protected static $resetRouteId = 'sulu_admin.reset';
-    const MAX_NUMBER_EMAILS = 3;
 
     /**
      * The interval in which the token is valid.
@@ -63,7 +64,7 @@ class ResettingController extends Controller
      * a link to the resetting route.
      *
      * @param Request $request
-     * @param bool    $generateNewKey If true a new token will be generated before sending the mail
+     * @param bool $generateNewKey If true a new token will be generated before sending the mail
      *
      * @return JsonResponse
      */
@@ -72,7 +73,7 @@ class ResettingController extends Controller
         try {
             /** @var UserInterface $user */
             $user = $this->findUser($request->get('user'));
-            if ($generateNewKey === true) {
+            if (true === $generateNewKey) {
                 $this->generateTokenForUser($user);
             }
             $email = $this->getEmail($user);
@@ -85,6 +86,10 @@ class ResettingController extends Controller
         } catch (NoTokenFoundException $ex) {
             $response = new JsonResponse($ex->toArray(), 400);
         } catch (TokenEmailsLimitReachedException $ex) {
+            $response = new JsonResponse($ex->toArray(), 400);
+        } catch (EmailTemplateException $ex) {
+            $response = new JsonResponse($ex->toArray(), 400);
+        } catch (UserNotInSystemException $ex) {
             $response = new JsonResponse($ex->toArray(), 400);
         }
 
@@ -126,7 +131,26 @@ class ResettingController extends Controller
      */
     protected function getSenderAddress(Request $request)
     {
-        return 'no-reply@' . $request->getHost();
+        $sender = $this->getParameter('sulu_security.reset_password.mail.sender');
+
+        if (!$sender || !$this->isEmailValid($sender)) {
+            $sender = 'no-reply@' . $request->getHost();
+        }
+
+        return $sender;
+    }
+
+    /**
+     * @param string $email
+     *
+     * @return bool
+     */
+    protected function isEmailValid($email)
+    {
+        $constraint = new EmailConstraint();
+        $result = $this->get('validator')->validate($email, $constraint);
+
+        return 0 === count($result);
     }
 
     /**
@@ -143,9 +167,9 @@ class ResettingController extends Controller
     protected function getSubject()
     {
         return $this->getTranslator()->trans(
-            static::$emailSubjectKey,
+            $this->getParameter('sulu_security.reset_password.mail.subject'),
             [],
-            static::$translationDomain
+            $this->getParameter('sulu_security.reset_password.mail.translation_domain')
         );
     }
 
@@ -153,24 +177,33 @@ class ResettingController extends Controller
      * @param UserInterface $user
      *
      * @return string
+     *
+     * @throws EmailTemplateException
      */
     protected function getMessage($user)
     {
-        $message = $this->getTranslator()->trans(
-            static::$emailMessageKey,
-            [],
-            static::$translationDomain
-        );
-
-        $message .= PHP_EOL;
-
-        $message .= $this->generateUrl(
+        $resetUrl = $this->generateUrl(
             static::$resetRouteId,
             ['token' => $user->getPasswordResetToken()],
-            true
+            UrlGeneratorInterface::ABSOLUTE_URL
         );
+        $template = $this->getParameter('sulu_security.reset_password.mail.template');
+        $translationDomain = $this->getParameter('sulu_security.reset_password.mail.translation_domain');
 
-        return $message;
+        if (!$this->get('templating')->exists($template)) {
+            throw new EmailTemplateException($template);
+        }
+
+        return trim(
+            $this->renderView(
+                $template,
+                [
+                    'user' => $user,
+                    'reset_url' => $resetUrl,
+                    'translation_domain' => $translationDomain,
+                ]
+            )
+        );
     }
 
     /**
@@ -182,7 +215,7 @@ class ResettingController extends Controller
      */
     private function getEmail(UserInterface $user)
     {
-        if ($user->getEmail() !== null) {
+        if (null !== $user->getEmail()) {
             return $user->getEmail();
         }
 
@@ -197,14 +230,21 @@ class ResettingController extends Controller
      * @return UserInterface
      *
      * @throws EntityNotFoundException
+     * @throws UserNotInSystemException
      */
     private function findUser($identifier)
     {
         try {
-            return $this->getUserRepository()->findUserByIdentifier($identifier);
+            $user = $this->getUserRepository()->findUserByIdentifier($identifier);
         } catch (NoResultException $exc) {
             throw new EntityNotFoundException($this->getUserRepository()->getClassName(), $identifier);
         }
+
+        if (!$this->hasSystem($user)) {
+            throw new UserNotInSystemException($this->getSystem(), $identifier);
+        }
+
+        return $user;
     }
 
     /**
@@ -274,29 +314,28 @@ class ResettingController extends Controller
      * Sends the password-reset-token of a user to an email-adress.
      *
      * @param UserInterface $user
-     * @param string        $from From-Email-Address
-     * @param string        $to   To-Email-Address
+     * @param string $from From-Email-Address
+     * @param string $to To-Email-Address
      *
      * @throws NoTokenFoundException
      * @throws TokenEmailsLimitReachedException
      */
     private function sendTokenEmail(UserInterface $user, $from, $to)
     {
-        if ($user->getPasswordResetToken() === null) {
+        if (null === $user->getPasswordResetToken()) {
             throw new NoTokenFoundException($user);
         }
-        if ($user->getPasswordResetTokenEmailsSent() === self::MAX_NUMBER_EMAILS) {
-            throw new TokenEmailsLimitReachedException(self::MAX_NUMBER_EMAILS, $user);
+
+        $maxNumberEmails = $this->getParameter('sulu_security.reset_password.mail.token_send_limit');
+
+        if ($user->getPasswordResetTokenEmailsSent() === $maxNumberEmails) {
+            throw new TokenEmailsLimitReachedException($maxNumberEmails, $user);
         }
         $mailer = $this->get('mailer');
         $em = $this->getDoctrine()->getManager();
-        $message = $mailer->createMessage()
-            ->setSubject(
+        $message = $mailer->createMessage()->setSubject(
                 $this->getSubject()
-            )
-            ->setFrom($from)
-            ->setTo($to)
-            ->setBody(
+            )->setFrom($from)->setTo($to)->setBody(
                 $this->getMessage($user)
             );
         $mailer->send($message);
@@ -309,13 +348,13 @@ class ResettingController extends Controller
      * Changes the password of a user.
      *
      * @param UserInterface $user
-     * @param string        $password
+     * @param string $password
      *
      * @throws MissingPasswordException
      */
     private function changePassword(UserInterface $user, $password)
     {
-        if ($password === '') {
+        if ('' === $password) {
             throw new MissingPasswordException();
         }
         $em = $this->getDoctrine()->getManager();
@@ -334,9 +373,8 @@ class ResettingController extends Controller
     private function generateTokenForUser(UserInterface $user)
     {
         // if a token was already requested within the request interval time frame
-        if ($user->getPasswordResetToken() !== null &&
-            $this->dateIsInRequestFrame($user->getPasswordResetTokenExpiresAt())
-        ) {
+        if (null !== $user->getPasswordResetToken()
+            && $this->dateIsInRequestFrame($user->getPasswordResetTokenExpiresAt())) {
             throw new TokenAlreadyRequestedException(self::getRequestInterval());
         }
         $em = $this->getDoctrine()->getManager();
@@ -360,7 +398,7 @@ class ResettingController extends Controller
      */
     private function dateIsInRequestFrame(\DateTime $date)
     {
-        if ($date === null) {
+        if (null === $date) {
             return false;
         }
 
@@ -399,8 +437,8 @@ class ResettingController extends Controller
      * Returns an encoded password gor a given one.
      *
      * @param UserInterface $user
-     * @param string        $password
-     * @param string        $salt
+     * @param string $password
+     * @param string $salt
      *
      * @return mixed
      */
@@ -417,5 +455,34 @@ class ResettingController extends Controller
     private function getUserRepository()
     {
         return $this->get('sulu.repository.user');
+    }
+
+    /**
+     * Check if given user has sulu-system.
+     *
+     * @param SuluUserInterface $user
+     *
+     * @return bool
+     */
+    private function hasSystem(SuluUserInterface $user)
+    {
+        $system = $this->getSystem();
+        foreach ($user->getRoleObjects() as $role) {
+            if ($role->getSystem() === $system) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Returns system name.
+     *
+     * @return string
+     */
+    private function getSystem()
+    {
+        return $this->container->getParameter('sulu_security.system');
     }
 }

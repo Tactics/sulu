@@ -12,8 +12,11 @@
 namespace Sulu\Bundle\MediaBundle\Entity;
 
 use JMS\Serializer\Annotation\Exclude;
+use Sulu\Bundle\AudienceTargetingBundle\Entity\TargetGroupInterface;
 use Sulu\Bundle\CategoryBundle\Entity\CategoryInterface;
+use Sulu\Bundle\TagBundle\Tag\TagInterface;
 use Sulu\Component\Persistence\Model\AuditableInterface;
+use Symfony\Component\HttpFoundation\File\MimeType\ExtensionGuesser;
 
 /**
  * FileVersion.
@@ -132,6 +135,11 @@ class FileVersion implements AuditableInterface
     private $categories = [];
 
     /**
+     * @var TargetGroupInterface[]
+     */
+    private $targetGroups;
+
+    /**
      * @var int
      */
     private $focusPointX;
@@ -152,6 +160,7 @@ class FileVersion implements AuditableInterface
         $this->formatOptions = new \Doctrine\Common\Collections\ArrayCollection();
         $this->tags = new \Doctrine\Common\Collections\ArrayCollection();
         $this->categories = new \Doctrine\Common\Collections\ArrayCollection();
+        $this->targetGroups = new \Doctrine\Common\Collections\ArrayCollection();
     }
 
     /**
@@ -273,6 +282,24 @@ class FileVersion implements AuditableInterface
     public function getMimeType()
     {
         return $this->mimeType;
+    }
+
+    /**
+     * Get extension.
+     *
+     * @return null|string
+     */
+    public function getExtension()
+    {
+        $pathInfo = pathinfo($this->getName());
+        $extension = ExtensionGuesser::getInstance()->guess($this->getMimeType());
+        if ($extension) {
+            return $extension;
+        } elseif (isset($pathInfo['extension'])) {
+            return $pathInfo['extension'];
+        }
+
+        return null;
     }
 
     /**
@@ -534,11 +561,11 @@ class FileVersion implements AuditableInterface
     /**
      * Add tags.
      *
-     * @param \Sulu\Bundle\TagBundle\Entity\Tag $tags
+     * @param TagInterface $tags
      *
      * @return FileVersion
      */
-    public function addTag(\Sulu\Bundle\TagBundle\Entity\Tag $tags)
+    public function addTag(TagInterface $tags)
     {
         $this->tags[] = $tags;
 
@@ -548,9 +575,9 @@ class FileVersion implements AuditableInterface
     /**
      * Remove tags.
      *
-     * @param \Sulu\Bundle\TagBundle\Entity\Tag $tags
+     * @param TagInterface $tags
      */
-    public function removeTag(\Sulu\Bundle\TagBundle\Entity\Tag $tags)
+    public function removeTag(TagInterface $tags)
     {
         $this->tags->removeElement($tags);
     }
@@ -714,6 +741,16 @@ class FileVersion implements AuditableInterface
     }
 
     /**
+     * Is active.
+     *
+     * @return bool
+     */
+    public function isActive()
+    {
+        return $this->version === $this->file->getVersion();
+    }
+
+    /**
      * Set storageType.
      *
      * @param string $storageType
@@ -787,6 +824,32 @@ class FileVersion implements AuditableInterface
     public function getCategories()
     {
         return $this->categories;
+    }
+
+    /**
+     * Add a target group.
+     *
+     * @param TargetGroupInterface $targetGroup
+     */
+    public function addTargetGroup(TargetGroupInterface $targetGroup)
+    {
+        $this->targetGroups[] = $targetGroup;
+    }
+
+    /**
+     * Remove all target groups.
+     */
+    public function removeTargetGroups()
+    {
+        $this->targetGroups->clear();
+    }
+
+    /**
+     * @return TargetGroupInterface[]
+     */
+    public function getTargetGroups()
+    {
+        return $this->targetGroups;
     }
 
     /**

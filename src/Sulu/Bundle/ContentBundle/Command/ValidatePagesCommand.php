@@ -15,7 +15,7 @@ use Jackalope\Query\Row;
 use Sulu\Component\Webspace\Webspace;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Formatter\OutputFormatterStyle;
-use Symfony\Component\Console\Helper\TableHelper;
+use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -47,9 +47,8 @@ class ValidatePagesCommand extends ContainerAwareCommand
         $select = '';
         $headers = [];
         foreach ($webspace->getAllLocalizations() as $localization) {
-            $select .= '[i18n:' . $localization->getLocalization() . '-template] as ' . $localization->getLocalization(
-                ) . ',';
-            $headers[] = $localization->getLocalization();
+            $select .= '[i18n:' . $localization->getLocale() . '-template] as ' . $localization->getLocale() . ',';
+            $headers[] = $localization->getLocale();
         }
         $select = rtrim($select, ',');
 
@@ -76,8 +75,7 @@ class ValidatePagesCommand extends ContainerAwareCommand
 
         $completeHeader = array_merge(['invalid', 'path'], $headers, ['description']);
 
-        /** @var TableHelper $table */
-        $table = $this->getHelper('table');
+        $table = new Table($output);
         $table->setHeaders($completeHeader);
         $result = 0;
         $messages = [];
@@ -92,12 +90,12 @@ class ValidatePagesCommand extends ContainerAwareCommand
             foreach ($headers as $header) {
                 $template = $row->getValue($header);
                 $tableRow[] = $template;
-                if ($template !== '' && !in_array($template, $structures)) {
+                if ('' !== $template && !in_array($template, $structures)) {
                     $tableRow[0] = 'X';
                     $descriptions[] = sprintf('Language "%s" contains a not existing xml-template', $header);
                     ++$result;
                 }
-                if ($template !== '' && !in_array($template, $availableStructureKeys)) {
+                if ('' !== $template && !in_array($template, $availableStructureKeys)) {
                     $tableRow[0] = 'X';
                     $descriptions[] = sprintf(
                         'Language "%s" contains a not implemented xml-template in webspace "%s"',
@@ -113,7 +111,7 @@ class ValidatePagesCommand extends ContainerAwareCommand
 
             $table->addRow($tableRow);
         }
-        $table->render($output);
+        $table->render();
 
         $style = new OutputFormatterStyle('red', null, ['bold', 'blink']);
         $output->getFormatter()->setStyle('error', $style);

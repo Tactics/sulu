@@ -13,6 +13,8 @@ namespace Sulu\Bundle\MediaBundle\Tests\Functional\Controller;
 
 use DateTime;
 use Doctrine\ORM\EntityManager;
+use Sulu\Bundle\AudienceTargetingBundle\Entity\TargetGroup;
+use Sulu\Bundle\AudienceTargetingBundle\Entity\TargetGroupRepositoryInterface;
 use Sulu\Bundle\CategoryBundle\Entity\CategoryInterface;
 use Sulu\Bundle\MediaBundle\Entity\Collection;
 use Sulu\Bundle\MediaBundle\Entity\CollectionMeta;
@@ -23,6 +25,7 @@ use Sulu\Bundle\MediaBundle\Entity\FileVersionMeta;
 use Sulu\Bundle\MediaBundle\Entity\Media;
 use Sulu\Bundle\MediaBundle\Entity\MediaType;
 use Sulu\Bundle\TagBundle\Entity\Tag;
+use Sulu\Bundle\TagBundle\Tag\TagInterface;
 use Sulu\Bundle\TestBundle\Testing\SuluTestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
@@ -79,6 +82,16 @@ class MediaControllerTest extends SuluTestCase
     private $category2;
 
     /**
+     * @var TagInterface
+     */
+    private $tag1;
+
+    /**
+     * @var TagInterface
+     */
+    private $tag2;
+
+    /**
      * @var string
      */
     protected $mediaDefaultTitle = 'photo';
@@ -120,7 +133,7 @@ class MediaControllerTest extends SuluTestCase
             }
         }
 
-        if ($counter != 0) {
+        if (0 != $counter) {
             rmdir($directory);
         }
     }
@@ -201,15 +214,17 @@ class MediaControllerTest extends SuluTestCase
         $this->audioType->setName('audio');
         $this->audioType->setDescription('This is a video');
 
+        $tagRepository = $this->getContainer()->get('sulu.repository.tag');
+
         // create some tags
-        $tag1 = new Tag();
-        $tag1->setName('Tag 1');
+        $this->tag1 = $tagRepository->createNew();
+        $this->tag1->setName('Tag 1');
 
-        $tag2 = new Tag();
-        $tag2->setName('Tag 2');
+        $this->tag2 = $tagRepository->createNew();
+        $this->tag2->setName('Tag 2');
 
-        $this->em->persist($tag1);
-        $this->em->persist($tag2);
+        $this->em->persist($this->tag1);
+        $this->em->persist($this->tag2);
         $this->em->persist($this->documentType);
         $this->em->persist($this->audioType);
         $this->em->persist($this->imageType);
@@ -222,15 +237,15 @@ class MediaControllerTest extends SuluTestCase
     {
         $media = new Media();
 
-        if ($type === 'image') {
+        if ('image' === $type) {
             $media->setType($this->imageType);
             $extension = 'jpeg';
             $mimeType = 'image/jpg';
-        } elseif ($type === 'audio') {
+        } elseif ('audio' === $type) {
             $media->setType($this->audioType);
             $extension = 'mp3';
             $mimeType = 'audio/mp3';
-        } elseif ($type === 'video') {
+        } elseif ('video' === $type) {
             $media->setType($this->videoType);
             $extension = 'mp4';
             $mimeType = 'video/mp4';
@@ -255,6 +270,8 @@ class MediaControllerTest extends SuluTestCase
         $fileVersion->setDownloadCounter(2);
         $fileVersion->addCategory($this->category);
         $fileVersion->addCategory($this->category2);
+        $fileVersion->addTag($this->tag1);
+        $fileVersion->addTag($this->tag2);
         $fileVersion->setChanged(new \DateTime('1937-04-20'));
         $fileVersion->setCreated(new \DateTime('1937-04-20'));
         $fileVersion->setStorageOptions('{"segment":"1","fileName":"' . $name . '.' . $extension . '"}');
@@ -806,6 +823,21 @@ class MediaControllerTest extends SuluTestCase
     public function testPost()
     {
         $client = $this->createAuthenticatedClient();
+        /** @var TargetGroupRepositoryInterface $targetGroupRepository */
+        $targetGroupRepository = $this->getContainer()->get('sulu.repository.target_group');
+
+        /** @var TargetGroup $targetGroup1 */
+        $targetGroup1 = $targetGroupRepository->createNew();
+        $targetGroup1->setTitle('Target Group 1');
+        $targetGroup1->setPriority(1);
+        /** @var TargetGroup $targetGroup2 */
+        $targetGroup2 = $targetGroupRepository->createNew();
+        $targetGroup2->setTitle('Target Group 2');
+        $targetGroup2->setPriority(1);
+
+        $this->getEntityManager()->persist($targetGroup1);
+        $this->getEntityManager()->persist($targetGroup2);
+        $this->getEntityManager()->flush();
 
         $imagePath = $this->getImagePath();
         $this->assertTrue(file_exists($imagePath));
@@ -832,8 +864,13 @@ class MediaControllerTest extends SuluTestCase
                     'en',
                     'de',
                 ],
+                'targetGroups' => [
+                    $targetGroup1->getId(),
+                    $targetGroup2->getId(),
+                ],
                 'categories' => [
-                    $this->category->getId(), $this->category2->getId(),
+                    $this->category->getId(),
+                    $this->category2->getId(),
                 ],
             ],
             [
@@ -897,6 +934,22 @@ class MediaControllerTest extends SuluTestCase
             'key' => $this->category2->getKey(),
             'name' => 'Second Category',
         ], $categories);
+
+        $targetGroups = [
+            [
+                'id' => $response->targetGroups[0]->id,
+            ],
+            [
+                'id' => $response->targetGroups[1]->id,
+            ],
+        ];
+
+        $this->assertContains([
+            'id' => $targetGroup1->getId(),
+        ], $targetGroups);
+        $this->assertContains([
+            'id' => $targetGroup2->getId(),
+        ], $targetGroups);
     }
 
     /**
@@ -1080,6 +1133,116 @@ class MediaControllerTest extends SuluTestCase
     /**
      * Test PUT to create a new FileVersion.
      */
+    public function testFileVersionDelete()
+    {
+        $media = $this->createMedia('photo');
+
+        $client = $this->createAuthenticatedClient();
+
+        $imagePath = $this->getImagePath();
+        $this->assertTrue(file_exists($imagePath));
+        $photo = new UploadedFile($imagePath, 'photo.jpeg', 'image/jpeg', 160768);
+
+        $client->request(
+            'POST',
+            '/api/media/' . $media->getId() . '?action=new-version',
+            [],
+            [
+                'fileVersion' => $photo,
+            ]
+        );
+
+        $response = json_decode($client->getResponse()->getContent());
+        $this->assertCount(2, (array) $response->versions);
+
+        $client->request(
+            'DELETE',
+            '/api/media/' . $media->getId() . '/versions/1?locale=en'
+        );
+
+        $this->assertHttpStatusCode(204, $client->getResponse());
+
+        $client->request(
+            'GET',
+            '/api/media/' . $media->getId() . '?locale=en'
+        );
+
+        $response = json_decode($client->getResponse()->getContent());
+
+        $this->assertCount(1, (array) $response->versions);
+        $this->assertEquals(2, $response->version);
+    }
+
+    /**
+     * Test PUT to create a new FileVersion.
+     */
+    public function testFileVersionDeleteCurrentShould400()
+    {
+        $media = $this->createMedia('photo');
+
+        $client = $this->createAuthenticatedClient();
+
+        $client->request(
+            'DELETE',
+            '/api/media/' . $media->getId() . '/versions/1?locale=en'
+        );
+
+        $this->assertHttpStatusCode(400, $client->getResponse());
+    }
+
+    /**
+     * Test PUT to create a new FileVersion.
+     */
+    public function testFileVersionDeleteNotExistShould400()
+    {
+        $media = $this->createMedia('photo');
+
+        $client = $this->createAuthenticatedClient();
+
+        $client->request(
+            'DELETE',
+            '/api/media/' . $media->getId() . '/versions/2?locale=en'
+        );
+
+        $this->assertHttpStatusCode(404, $client->getResponse());
+    }
+
+    /**
+     * Test PUT to create a new FileVersion.
+     */
+    public function testFileVersionDeleteActiveShould400()
+    {
+        $media = $this->createMedia('photo');
+
+        $client = $this->createAuthenticatedClient();
+
+        $imagePath = $this->getImagePath();
+        $this->assertTrue(file_exists($imagePath));
+        $photo = new UploadedFile($imagePath, 'photo.jpeg', 'image/jpeg', 160768);
+
+        $client->request(
+            'POST',
+            '/api/media/' . $media->getId() . '?action=new-version',
+            [],
+            [
+                'fileVersion' => $photo,
+            ]
+        );
+
+        $response = json_decode($client->getResponse()->getContent());
+        $this->assertCount(2, (array) $response->versions);
+
+        $client->request(
+            'DELETE',
+            '/api/media/' . $media->getId() . '/versions/2?locale=en'
+        );
+
+        $this->assertHttpStatusCode(400, $client->getResponse());
+    }
+
+    /**
+     * Test PUT to create a new FileVersion.
+     */
     public function testPutWithoutFile()
     {
         $media = $this->createMedia('photo');
@@ -1101,6 +1264,7 @@ class MediaControllerTest extends SuluTestCase
                 'contentLanguages' => [
                     'en-gb',
                 ],
+                'tags' => ['Tag 1', 'Tag 2'],
                 'publishLanguages' => [
                     'en-gb',
                     'en-au',
@@ -1125,6 +1289,8 @@ class MediaControllerTest extends SuluTestCase
         $this->assertEquals(1, $response->focusPointX);
         $this->assertEquals(2, $response->focusPointY);
         $this->assertNotEmpty($response->url);
+        $this->assertEquals(['Tag 1', 'Tag 2'], $response->tags);
+
         $this->assertNotEmpty($response->thumbnails);
         $this->assertEquals(
             [
@@ -1141,6 +1307,29 @@ class MediaControllerTest extends SuluTestCase
             ],
             $response->publishLanguages
         );
+    }
+
+    /**
+     * Test tag remove.
+     */
+    public function testTagRemove()
+    {
+        $media = $this->createMedia('photo');
+
+        $client = $this->createAuthenticatedClient();
+
+        // Check Tag Remove
+        $this->getEntityManager()->remove($this->tag1);
+        $this->getEntityManager()->flush();
+
+        $client->request(
+            'GET',
+            '/api/media/' . $media->getId() . '?locale=en'
+        );
+
+        $response = json_decode($client->getResponse()->getContent());
+        $this->assertHttpStatusCode(200, $client->getResponse());
+        $this->assertEquals(['Tag 2'], $response->tags);
     }
 
     /**

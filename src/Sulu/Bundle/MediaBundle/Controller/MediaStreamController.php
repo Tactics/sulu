@@ -12,6 +12,7 @@
 namespace Sulu\Bundle\MediaBundle\Controller;
 
 use Sulu\Bundle\MediaBundle\Entity\FileVersion;
+use Sulu\Bundle\MediaBundle\Entity\MediaInterface;
 use Sulu\Bundle\MediaBundle\Media\Exception\FileVersionNotFoundException;
 use Sulu\Bundle\MediaBundle\Media\Exception\ImageProxyException;
 use Sulu\Bundle\MediaBundle\Media\Exception\MediaException;
@@ -67,7 +68,7 @@ class MediaStreamController extends Controller
      * @param Request $request
      * @param int $id
      *
-     * @return BinaryFileResponse
+     * @return Response
      */
     public function downloadAction(Request $request, $id)
     {
@@ -85,9 +86,12 @@ class MediaStreamController extends Controller
                 return new Response(null, 404);
             }
 
-            $dispositionType = ResponseHeaderBag::DISPOSITION_ATTACHMENT;
-            if ($request->get('inline', false)) {
-                $dispositionType = ResponseHeaderBag::DISPOSITION_INLINE;
+            if ($request->query->has('inline')) {
+                $forceInline = (bool) $request->get('inline', false);
+                $dispositionType = $forceInline ? ResponseHeaderBag::DISPOSITION_INLINE : ResponseHeaderBag::DISPOSITION_ATTACHMENT;
+            } else {
+                $dispositionType = $this->get('sulu_media.disposition_type.resolver')
+                    ->getByMimeType($fileVersion->getMimeType());
             }
 
             if (!$noCount) {
@@ -114,31 +118,48 @@ class MediaStreamController extends Controller
         $locale,
         $dispositionType = ResponseHeaderBag::DISPOSITION_ATTACHMENT
     ) {
-        $cleaner = $this->get('sulu.content.path_cleaner');
-
         $fileName = $fileVersion->getName();
         $fileSize = $fileVersion->getSize();
         $storageOptions = $fileVersion->getStorageOptions();
         $mimeType = $fileVersion->getMimeType();
         $version = $fileVersion->getVersion();
+        $lastModified = $fileVersion->getCreated(); // use created as file itself is not changed when entity is changed
 
         $path = $this->getStorage()->load($fileName, $version, $storageOptions);
 
         $response = new BinaryFileResponse($path);
 
-        $pathInfo = pathinfo($fileName);
-
         // Prepare headers
         $disposition = $response->headers->makeDisposition(
             $dispositionType,
             $fileName,
-            $cleaner->cleanup($pathInfo['filename'], $locale) . '.' . $pathInfo['extension']
+            $this->cleanUpFileName($fileName, $locale, $fileVersion->getExtension())
         );
+
+        // Set headers for
+        $file = $fileVersion->getFile();
+        if ($fileVersion->getVersion() !== $file->getVersion()) {
+            $latestFileVersion = $file->getLatestFileVersion();
+
+            $response->headers->set(
+                'Link',
+                sprintf(
+                    '<%s>; rel="canonical"',
+                    $this->getMediaManager()->getUrl(
+                        $file->getMedia()->getId(),
+                        $latestFileVersion->getName(),
+                        $latestFileVersion->getVersion()
+                    )
+                )
+            );
+            $response->headers->set('X-Robots-Tag', 'noindex, follow');
+        }
 
         // Set headers
         $response->headers->set('Content-Type', !empty($mimeType) ? $mimeType : 'application/octet-stream');
         $response->headers->set('Content-Disposition', $disposition);
         $response->headers->set('Content-length', $fileSize);
+        $response->headers->set('Last-Modified', $lastModified->format('D, d M Y H:i:s \G\M\T'));
 
         return $response;
     }
@@ -147,40 +168,56 @@ class MediaStreamController extends Controller
      * @param int $id
      * @param int $version
      *
-     * @return null|FileVersion
+     * @return FileVersion|null
      *
      * @throws \Sulu\Bundle\MediaBundle\Media\Exception\FileVersionNotFoundException
      */
     protected function getFileVersion($id, $version)
     {
-        /*
-         * @var MediaInterface
-         */
+        /** @var MediaInterface $mediaEntity */
         $mediaEntity = $this->container->get('sulu.repository.media')->findMediaById($id);
 
         if (!$mediaEntity) {
-            return;
+            return null;
         }
-
-        $currentFileVersion = null;
-        $version = $version === null ? $mediaEntity->getFiles()[0]->getVersion() : $version;
 
         $file = $mediaEntity->getFiles()[0];
 
-        /*
-         * @var FileVersion
-         */
-        foreach ($file->getFileVersions() as $fileVersion) {
-            if ($fileVersion->getVersion() == $version) {
-                $currentFileVersion = $fileVersion;
-            }
+        if (!$file) {
+            return null;
         }
 
-        if (!$currentFileVersion) {
+        if (!$version) {
+            $version = $mediaEntity->getFiles()[0]->getVersion();
+        }
+
+        $fileVersion = $file->getFileVersion((int) $version);
+
+        if (!$fileVersion) {
             throw new FileVersionNotFoundException($id, $version);
         }
 
-        return $currentFileVersion;
+        return $fileVersion;
+    }
+
+    /**
+     * Cleaned up filename.
+     *
+     * @param string $fileName
+     * @param string $locale
+     * @param string $extension
+     *
+     * @return string
+     */
+    private function cleanUpFileName($fileName, $locale, $extension)
+    {
+        $pathInfo = pathinfo($fileName);
+        $cleanedFileName = $this->get('sulu.content.path_cleaner')->cleanup($pathInfo['filename'], $locale);
+        if ($extension) {
+            $cleanedFileName .= '.' . $extension;
+        }
+
+        return $cleanedFileName;
     }
 
     /**
@@ -190,7 +227,7 @@ class MediaStreamController extends Controller
      */
     protected function getCacheManager()
     {
-        if ($this->cacheManager === null) {
+        if (null === $this->cacheManager) {
             $this->cacheManager = $this->get('sulu_media.format_manager');
         }
 
@@ -204,7 +241,7 @@ class MediaStreamController extends Controller
      */
     protected function getMediaManager()
     {
-        if ($this->mediaManager === null) {
+        if (null === $this->mediaManager) {
             $this->mediaManager = $this->get('sulu_media.media_manager');
         }
 
@@ -218,7 +255,7 @@ class MediaStreamController extends Controller
      */
     protected function getStorage()
     {
-        if ($this->storage === null) {
+        if (null === $this->storage) {
             $this->storage = $this->get('sulu_media.storage');
         }
 

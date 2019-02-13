@@ -60,8 +60,8 @@ class WebsiteRequestProcessor implements RequestProcessorInterface
      */
     public function process(Request $request, RequestAttributes $requestAttributes)
     {
-        $host = $request->getHttpHost();
-        $url = $host . $request->getPathInfo();
+        $host = $requestAttributes->getAttribute('host');
+        $url = $host . $requestAttributes->getAttribute('path');
         foreach ($this->webspaceManager->getPortalInformations($this->environment) as $portalInformation) {
             $portalUrl = $this->replacer->replaceHost($portalInformation->getUrl(), $host);
             $portalInformation->setUrl($portalUrl);
@@ -74,7 +74,7 @@ class WebsiteRequestProcessor implements RequestProcessorInterface
             $this->environment
         );
 
-        if (count($portalInformations) === 0) {
+        if (0 === count($portalInformations)) {
             return new RequestAttributes();
         }
 

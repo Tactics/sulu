@@ -83,7 +83,7 @@ class CollectionManagerTest extends \PHPUnit_Framework_TestCase
         $entity->getMeta()->willReturn([$entityMeta->reveal()]);
         $entity->getId()->willReturn($id);
 
-        if ($parent !== null) {
+        if (null !== $parent) {
             $parentEntity = $this->prophesize(Collection::class);
             $parentEntity->getId()->willReturn($parent);
             $entity->getParent()->willReturn($parentEntity->reveal());
@@ -104,7 +104,7 @@ class CollectionManagerTest extends \PHPUnit_Framework_TestCase
             Argument::any(),
             Argument::any()
         )->willReturn(new \ArrayIterator([]));
-        $this->collectionRepository->count(
+        $this->collectionRepository->countCollections(
             0,
             ['search' => 'test', 'locale' => 'de', 'systemCollections' => true],
             null
@@ -123,7 +123,7 @@ class CollectionManagerTest extends \PHPUnit_Framework_TestCase
             Argument::any(),
             Argument::any()
         )->willReturn(new \ArrayIterator([]));
-        $this->collectionRepository->count(
+        $this->collectionRepository->countCollections(
             0,
             ['search' => 'test', 'locale' => 'de', 'systemCollections' => false],
             null
@@ -144,6 +144,7 @@ class CollectionManagerTest extends \PHPUnit_Framework_TestCase
         ];
 
         $this->collectionRepository->findTree(5, 'de')->willReturn($entities);
+        $this->mediaRepository->findMedia(Argument::cetera())->willReturn([]);
 
         $result = $this->collectionManager->getTreeById(5, 'de');
 

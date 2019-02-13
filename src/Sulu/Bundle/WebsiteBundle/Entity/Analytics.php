@@ -54,6 +54,8 @@ class Analytics
 
     /**
      * @var Collection
+     *
+     * @Exclude
      */
     private $domains;
 
@@ -77,7 +79,7 @@ class Analytics
      *
      * @param string $title
      *
-     * @return Analytics
+     * @return self
      */
     public function setTitle($title)
     {
@@ -101,7 +103,7 @@ class Analytics
      *
      * @param bool $allDomains
      *
-     * @return Analytics
+     * @return self
      */
     public function setAllDomains($allDomains)
     {
@@ -125,7 +127,7 @@ class Analytics
      *
      * @param string $content
      *
-     * @return Analytics
+     * @return self
      */
     public function setContent($content)
     {
@@ -149,7 +151,7 @@ class Analytics
      *
      * @param string $type
      *
-     * @return Analytics
+     * @return self
      */
     public function setType($type)
     {
@@ -173,7 +175,7 @@ class Analytics
      *
      * @param string $webspaceKey
      *
-     * @return Analytics
+     * @return self
      */
     public function setWebspaceKey($webspaceKey)
     {
@@ -197,7 +199,7 @@ class Analytics
      *
      * @param Domain $domain
      *
-     * @return Analytics
+     * @return self
      */
     public function addDomain(Domain $domain)
     {

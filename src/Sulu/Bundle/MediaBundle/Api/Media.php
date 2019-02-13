@@ -15,6 +15,7 @@ use JMS\Serializer\Annotation\ExclusionPolicy;
 use JMS\Serializer\Annotation\Groups;
 use JMS\Serializer\Annotation\SerializedName;
 use JMS\Serializer\Annotation\VirtualProperty;
+use Sulu\Bundle\AudienceTargetingBundle\Entity\TargetGroupInterface;
 use Sulu\Bundle\CategoryBundle\Api\Category;
 use Sulu\Bundle\CategoryBundle\Entity\CategoryInterface as CategoryEntity;
 use Sulu\Bundle\MediaBundle\Entity\File;
@@ -26,7 +27,7 @@ use Sulu\Bundle\MediaBundle\Entity\MediaInterface;
 use Sulu\Bundle\MediaBundle\Entity\MediaType;
 use Sulu\Bundle\MediaBundle\Media\Exception\FileNotFoundException;
 use Sulu\Bundle\MediaBundle\Media\Exception\FileVersionNotFoundException;
-use Sulu\Bundle\TagBundle\Entity\Tag;
+use Sulu\Bundle\TagBundle\Tag\TagInterface;
 use Sulu\Component\Rest\ApiWrapper;
 use Sulu\Component\Security\Authentication\UserInterface;
 
@@ -108,7 +109,7 @@ class Media extends ApiWrapper
     /**
      * @VirtualProperty
      * @SerializedName("id")
-     * @Groups({"partialMedia"})
+     * @Groups({"partialMedia", "Default"})
      *
      * @return int
      */
@@ -216,6 +217,14 @@ class Media extends ApiWrapper
     public function getMimeType()
     {
         return $this->getFileVersion()->getMimeType();
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getExtension()
+    {
+        return $this->getFileVersion()->getExtension();
     }
 
     /**
@@ -397,16 +406,21 @@ class Media extends ApiWrapper
     public function getVersions()
     {
         $versions = [];
+
+        $file = $this->getFile();
+
         /** @var FileVersion $fileVersion */
-        foreach ($this->getFile()->getFileVersions() as $fileVersion) {
+        foreach ($file->getFileVersions() as $fileVersion) {
             $versionData = [];
             if (isset($this->additionalVersionData[$fileVersion->getVersion()])) {
                 $versionData = $this->additionalVersionData[$fileVersion->getVersion()];
             }
+
             $versionData['version'] = $fileVersion->getVersion();
             $versionData['name'] = $fileVersion->getName();
             $versionData['created'] = $fileVersion->getCreated();
             $versionData['changed'] = $fileVersion->getChanged();
+            $versionData['active'] = $fileVersion->isActive();
             $versions[$fileVersion->getVersion()] = $versionData;
         }
 
@@ -624,11 +638,11 @@ class Media extends ApiWrapper
     }
 
     /**
-     * @param Tag $tagEntity
+     * @param TagInterface $tagEntity
      *
      * @return $this
      */
-    public function addTag(Tag $tagEntity)
+    public function addTag(TagInterface $tagEntity)
     {
         $fileVersion = $this->getFileVersion();
         if (!$fileVersion->getTags()->contains($tagEntity)) {
@@ -648,7 +662,7 @@ class Media extends ApiWrapper
     {
         $tags = [];
         foreach ($this->getFileVersion()->getTags() as $tag) {
-            /* @var Tag $tag */
+            /* @var TagInterface $tag */
             array_push($tags, $tag->getName());
         }
 
@@ -845,27 +859,26 @@ class Media extends ApiWrapper
      */
     public function getFileVersion()
     {
-        if ($this->fileVersion !== null) {
+        if (null !== $this->fileVersion) {
             return $this->fileVersion;
         }
 
         /** @var File $file */
         foreach ($this->entity->getFiles() as $file) {
-            if ($this->version !== null) {
+            if (null !== $this->version) {
                 $version = $this->version;
             } else {
                 $version = $file->getVersion();
             }
-            /** @var FileVersion $fileVersion */
-            foreach ($file->getFileVersions() as $fileVersion) {
-                if ($fileVersion->getVersion() == $version) {
-                    $this->fileVersion = $fileVersion;
 
-                    return $fileVersion;
-                }
+            if ($fileVersion = $file->getFileVersion($version)) {
+                $this->fileVersion = $fileVersion;
+
+                return $fileVersion;
             }
             break; // currently only one file per media exists
         }
+
         throw new FileVersionNotFoundException($this->entity->getId(), $this->version);
     }
 
@@ -876,7 +889,7 @@ class Media extends ApiWrapper
      */
     public function getFile()
     {
-        if ($this->file !== null) {
+        if (null !== $this->file) {
             return $this->file;
         }
 
@@ -888,7 +901,7 @@ class Media extends ApiWrapper
             return $this->file;
         }
 
-        throw new FileNotFoundException($this->entity->getId(), $this->version);
+        throw new FileNotFoundException($this->entity->getId());
     }
 
     /**
@@ -972,11 +985,15 @@ class Media extends ApiWrapper
 
     /**
      * Removes all category from the entity.
+     *
+     * @return self
      */
     public function removeCategories()
     {
         $fileVersion = $this->getFileVersion();
         $fileVersion->removeCategories();
+
+        return $this;
     }
 
     /**
@@ -1001,6 +1018,52 @@ class Media extends ApiWrapper
         }
 
         return $apiCategories;
+    }
+
+    /**
+     * Adds a target group to the entity.
+     *
+     * @param TargetGroupInterface $targetGroup
+     *
+     * @return self
+     */
+    public function addTargetGroup(TargetGroupInterface $targetGroup)
+    {
+        $fileVersion = $this->getFileVersion();
+        $fileVersion->addTargetGroup($targetGroup);
+
+        return $this;
+    }
+
+    /**
+     * Removes all target groups from the entities.
+     *
+     * @return self
+     */
+    public function removeTargetGroups()
+    {
+        $fileVersion = $this->getFileVersion();
+        $fileVersion->removeTargetGroups();
+
+        return $this;
+    }
+
+    /**
+     * Returns the target groups of the media.
+     *
+     * @VirtualProperty
+     * @SerializedName("targetGroups")
+     * @Groups({"fullMediaAudienceTargeting"})
+     *
+     * @return TargetGroupInterface[]
+     */
+    public function getTargetGroups()
+    {
+        if (!$this->getFileVersion()->getTargetGroups()) {
+            return [];
+        }
+
+        return $this->getFileVersion()->getTargetGroups()->toArray();
     }
 
     /**

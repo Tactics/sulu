@@ -68,9 +68,9 @@ class StructureBridgeTest extends \PHPUnit_Framework_TestCase
             Argument::type(StructureBridge::class)
         )->will(
             function ($args) use ($title, $images) {
-                if ($args[0]->getName() === 'title') {
+                if ('title' === $args[0]->getName()) {
                     return $title->reveal();
-                } elseif ($args[0]->getName() === 'images') {
+                } elseif ('images' === $args[0]->getName()) {
                     return $images->reveal();
                 }
             }
@@ -165,5 +165,22 @@ class StructureBridgeTest extends \PHPUnit_Framework_TestCase
 
         $this->assertFalse($structure->getIsShadow());
         $this->assertNull($structure->getShadowBaseLanguage());
+    }
+
+    public function testWithoutDocument()
+    {
+        $metadata = $this->prophesize(StructureMetadata::class);
+        $inspector = $this->prophesize(DocumentInspector::class);
+        $propertyFactory = $this->prophesize(LegacyPropertyFactory::class);
+
+        $structure = new StructureBridge(
+            $metadata->reveal(),
+            $inspector->reveal(),
+            $propertyFactory->reveal(),
+            null
+        );
+
+        $this->assertNull($structure->getWebspaceKey());
+        $this->assertFalse($structure->getIsShadow());
     }
 }

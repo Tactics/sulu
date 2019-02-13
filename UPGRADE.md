@@ -1,6 +1,215 @@
 # Upgrade
 
-## dev-develop
+## 1.6.24
+
+### Collection Repository count function changed
+
+For the php 7.3 compatibility we needed to upgrade doctrine/orm for this we needed to rename the following method:
+
+ * Sulu\Bundle\MediaBundle\Entity\CollectionRepositoryInterface::count => Sulu\Bundle\MediaBundle\Entity\CollectionRepositoryInterface::countCollections
+
+## 1.6.17
+
+### Address latitude/longitude
+
+The address of contact/account was extended by latitude and longitude - therefore the database has to be updated.
+Run the following command:
+
+```bash
+php bin/console doctrine:schema:update --force
+```
+
+or the following SQL statements on your database:
+
+```sql
+ALTER TABLE co_addresses ADD latitude DOUBLE PRECISION DEFAULT NULL, ADD longitude DOUBLE PRECISION DEFAULT NULL;
+```
+
+### SEO Title
+
+The default length for the title field in the SEO tab has changed from 55 to 70, because Google has expanded
+the max length. If you want to have a different length for some reason you can change it in the configuration:
+
+```yaml
+sulu_content:
+    seo:
+        max_title_length: 55
+```
+
+## 1.6.16
+
+### Page index extension
+
+The field `authored` are now added to massive_search index. Because of this the index has to be rebuild.
+
+```bash
+bin/adminconsole massive:search:reindex --provider sulu_structure
+bin/websiteconsole massive:search:reindex --provider sulu_structure
+```
+
+## 1.6.15
+
+### Priority of UpdateResponseSubscriber
+
+If you had hooked into response-event of symfony to change the cache behavior of Sulu, be aware of changed priority
+and update yours if required.
+
+## 1.6.11
+
+### SEO Description
+
+The default length for the description field in the SEO tab has changed from 155 to 320, because Google has expanded
+the max length. If you want to have a different length for some reason you can change it in the configuration:
+
+```yaml
+sulu_content:
+    seo:
+        max_description_length: 155
+```
+
+## 1.6.9
+
+### CacheBuilder
+
+The `CacheBuilder`, which was responsible for deleting the cache at the beginning of the `sulu:build` command has been
+removed, because after clearing the cache the container is not functional anymore starting with Symfony 3.4.
+
+So from now on the `cache:clear` command has to be executed manually before the `sulu:build` command.
+
+### sulu_content_load
+
+We have changed the behaviour of the `sulu_content_load()` twig extension. Instead of throwing an exception when the given parameter
+cannot be resolved to a valid document, it will now just log the exception and return null, so you can gracefully handle this case
+in your twig template.
+
+```
+{% set content = sulu_content_load(null) %}
+{# content is now null #}
+
+{% set content = sulu_content_load('not-existing-guid') %}
+{# content is now null #}
+```
+
+## 1.6.7
+
+### Custom Analytics
+
+We've added the possibility to determine the position of the content.
+The '<script></script>' wrapper was also removed from the custom template.
+That means the user has to add this wrapper when it's needed.
+ 
+Changes to existing custom analytics needs to be deployed with following SQL statement on your database:
+
+```sql
+UPDATE we_analytics w SET content = CONCAT('{"position":"bodyClose","value":"<script>', SUBSTRING(content,2,LENGTH(content) -2), '</script>"}') WHERE w.type = 'custom';
+```
+
+## 1.6.4
+
+### File Version - Tag Cascading
+
+That its possible to delete a Tag, which is referenced in a Media FileVersion, a `on-delete CASCADE` need to be added to the database.
+Run the following command:
+
+```bash
+php bin/console doctrine:schema:update --force
+```
+
+or the following SQL statements on your database:
+
+```sql
+ALTER TABLE me_file_version_tags DROP FOREIGN KEY FK_150A30BE1C41CAB8;
+ALTER TABLE me_file_version_tags ADD CONSTRAINT FK_150A30BE1C41CAB8 FOREIGN KEY (idTags) REFERENCES ta_tags (id) ON DELETE CASCADE;
+```
+
+## 1.6.0
+
+### Default Snippets
+
+Default snippets were replaced with snippet areas. To have the same behaviour as before replace the old twig extension:
+
+__Before:__
+
+```twig
+sulu_snippet_load_default('your_snippet_key')[0]
+```
+
+__After:__
+
+```twig
+sulu_snippet_load_by_area('your_snippet_key')
+```
+
+### Sitemap Localization
+
+The `build` method of the `SitemapProviderInterface` had a `$locale` parameter,
+which shouldn't be there, because the sitemaps need to be generated or all
+locales at once. If you have implemented this interface you have to adapt the
+implementation to remove the `$locale` parameter and return the URLs for all
+locales instead.
+
+### Snippet list
+
+Some field configuration has changed, so we need to delete the saved one in the database:
+```sql
+DELETE FROM `se_user_settings` WHERE `settingsKey` = 'snippetsFields';
+```
+
+## 1.6.0-RC1
+
+### Social media profile fixtures
+
+Add fixtures for social media profile of contacts. Run following command to
+add the fixtures:
+
+```bash
+INSERT INTO co_social_media_profile_types (id, name) VALUES ('1', 'Facebook'), ('2', 'Twitter'), ('3', 'Instagram');
+```
+
+### ProxyManager
+
+We had to update `ocramius/proxy-manager` in order to be compatible with PHP 7.
+In case you have defined your own proxies, you should check the
+[ProxyManager UPGRADE.md](https://github.com/Ocramius/ProxyManager/blob/master/UPGRADE.md).
+
+### ContentTypeInterface
+
+Following methods and constants was removed from `ContentTypeInterface`.
+
+* `PRE_SAVE`
+* `POST_SAVE`
+* `getType()`
+* `getReferenceUuids()`
+
+For replacement of `getReferenceUuids` we have introduced the 
+[reference-store](http://docs.sulu.io/en/latest/bundles/content/reference-store.html)
+and the `PreResolveContentTypeInterface::preResolve` method. 
+
+### Additional routing file from SuluRouteBundle
+
+Add following lines to `app/config/admin/routing.yml`:
+
+```yml
+sulu_route_api:
+    type: rest
+    resource: "@SuluRouteBundle/Resources/config/routing_api.xml"
+    prefix: /admin/api
+```
+
+### Route-Table changed
+
+The route-table was extended with auditable information. Run following sql-statement to
+update the database schema.
+
+```bash
+ALTER TABLE ro_routes ADD changed DATETIME DEFAULT '1970-01-01 00:00:00' NOT NULL, ADD created DATETIME DEFAULT '1970-01-01 00:00:00' NOT NULL;
+ALTER TABLE ro_routes CHANGE created created DATETIME NOT NULL, CHANGE changed changed DATETIME NOT NULL;
+```
+
+### Highlight section styling changed
+
+To make the highlight section reusable the css not longer depend on the `#content-form`
+selector you should use now the `.form` class instead. 
 
 ### Removed symfony/security-acl dependency
 
@@ -10,6 +219,10 @@ The following deprecated classes was removed:
 * `Sulu\Component\Security\Authorization\AccessControl\SymfonyAccessControlManager`
 
 Therefor the dependency `symfony/security-acl` was useless and removed.
+
+## 1.5.15
+
+Added method `hasType` to `Sulu\Component\Content\Compat\Block\BlockPropertyInterface`.
 
 ## 1.5.0-RC1
 
@@ -57,6 +270,8 @@ start values for `author` and `authored`.
 ```
 app/console phpcr:migrations:migrate
 ```
+
+If the migration failed with `getContact() on a none object` upgrade to at least 1.5.4 and run the migration command again.
 
 ### Twig 2
 

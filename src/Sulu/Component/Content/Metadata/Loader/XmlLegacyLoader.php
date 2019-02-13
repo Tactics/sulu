@@ -135,7 +135,7 @@ class XmlLegacyLoader implements LoaderInterface
             // check all section properties as well
             foreach ($result['properties'] as $property) {
                 if (!$requiredPropertyNameFound
-                    && $property['type'] == 'section'
+                    && 'section' == $property['type']
                     && array_key_exists($requiredPropertyName, $property['properties'])
                 ) {
                     $requiredPropertyNameFound = true;
@@ -167,7 +167,7 @@ class XmlLegacyLoader implements LoaderInterface
      */
     private function loadTemplateAttributes($resource, \DOMXPath $xpath, $type)
     {
-        if ($type === 'page' || $type === 'home') {
+        if ('page' === $type || 'home' === $type) {
             $result = [
                 'key' => $this->getValueFromXPath('/x:template/x:key', $xpath),
                 'view' => $this->getValueFromXPath('/x:template/x:view', $xpath),
@@ -175,13 +175,14 @@ class XmlLegacyLoader implements LoaderInterface
                 'internal' => $this->getValueFromXPath('/x:template/x:internal', $xpath),
                 'cacheLifetime' => $this->loadCacheLifetime('/x:template/x:cacheLifetime', $xpath),
                 'tags' => $this->loadStructureTags('/x:template/x:tag', $xpath),
+                'areas' => $this->loadStructureAreas('/x:template/x:areas/x:area', $xpath),
                 'meta' => $this->loadMeta('/x:template/x:meta/x:*', $xpath),
             ];
 
             $result = array_filter(
                 $result,
                 function ($value) {
-                    return $value !== null;
+                    return null !== $value;
                 }
             );
 
@@ -204,10 +205,16 @@ class XmlLegacyLoader implements LoaderInterface
                 'controller' => $this->getValueFromXPath('/x:template/x:controller', $xpath),
                 'cacheLifetime' => $this->loadCacheLifetime('/x:template/x:cacheLifetime', $xpath),
                 'tags' => $this->loadStructureTags('/x:template/x:tag', $xpath),
+                'areas' => $this->loadStructureAreas('/x:template/x:areas/x:area', $xpath),
                 'meta' => $this->loadMeta('/x:template/x:meta/x:*', $xpath),
             ];
 
-            $result = array_filter($result);
+            $result = array_filter(
+                $result,
+                function ($value) {
+                    return null !== $value;
+                }
+            );
 
             if (count($result) < 1) {
                 throw new InvalidXmlException($result['key']);
@@ -226,13 +233,13 @@ class XmlLegacyLoader implements LoaderInterface
 
         /** @var \DOMElement $node */
         foreach ($xpath->query($path, $context) as $node) {
-            if ($node->tagName === 'property') {
+            if ('property' === $node->tagName) {
                 $value = $this->loadProperty($templateKey, $xpath, $node, $tags);
                 $result[$value['name']] = $value;
-            } elseif ($node->tagName === 'block') {
+            } elseif ('block' === $node->tagName) {
                 $value = $this->loadBlock($templateKey, $xpath, $node, $tags);
                 $result[$value['name']] = $value;
-            } elseif ($node->tagName === 'section') {
+            } elseif ('section' === $node->tagName) {
                 $value = $this->loadSection($templateKey, $xpath, $node, $tags);
                 $result[$value['name']] = $value;
             }
@@ -258,6 +265,7 @@ class XmlLegacyLoader implements LoaderInterface
 
         $result['mandatory'] = $this->getValueFromXPath('@mandatory', $xpath, $node, false);
         $result['multilingual'] = $this->getValueFromXPath('@multilingual', $xpath, $node, true);
+        $result['onInvalid'] = $this->getValueFromXPath('@onInvalid', $xpath, $node);
         $result['tags'] = $this->loadTags('x:tag', $tags, $xpath, $node);
         $result['params'] = $this->loadParams('x:params/x:param', $xpath, $node);
         $result['meta'] = $this->loadMeta('x:meta/x:*', $xpath, $node);
@@ -367,7 +375,7 @@ class XmlLegacyLoader implements LoaderInterface
      * Loads the tags for the structure.
      *
      * @param $path
-     * @param $xpath
+     * @param \DOMXPath $xpath
      *
      * @return array
      *
@@ -437,6 +445,45 @@ class XmlLegacyLoader implements LoaderInterface
     }
 
     /**
+     * Loads the areas for the structure.
+     *
+     * @param $path
+     * @param \DOMXPath $xpath
+     *
+     * @return array
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function loadStructureAreas($path, $xpath)
+    {
+        $result = [];
+
+        foreach ($xpath->query($path) as $node) {
+            $area = [];
+
+            foreach ($node->attributes as $key => $attr) {
+                if (in_array($key, ['key'])) {
+                    $area[$key] = $attr->value;
+                } else {
+                    $area['attributes'][$key] = $attr->value;
+                }
+            }
+
+            $meta = $this->loadMeta('x:meta/x:*', $xpath, $node);
+            $area['title'] = $meta['title'];
+
+            if (!isset($area['key'])) {
+                // this should not happen because of the XSD validation
+                throw new \InvalidArgumentException('Zone does not have a key in the attributes');
+            }
+
+            $result[] = $area;
+        }
+
+        return $result;
+    }
+
+    /**
      * load params from given node.
      */
     private function loadParams($path, \DOMXPath $xpath, \DOMNode $context = null)
@@ -456,7 +503,7 @@ class XmlLegacyLoader implements LoaderInterface
      */
     private function loadParam(\DOMXPath $xpath, \DOMNode $node)
     {
-        $name = $this->getValueFromXPath('@name', $xpath, $node, 'string');
+        $name = $this->getValueFromXPath('@name', $xpath, $node);
         $type = $this->getValueFromXPath('@type', $xpath, $node, 'string');
         $meta = $this->loadMeta('x:meta/x:*', $xpath, $node);
 
@@ -465,7 +512,7 @@ class XmlLegacyLoader implements LoaderInterface
                 $value = $this->loadParams('x:param', $xpath, $node);
                 break;
             default:
-                $value = $this->getValueFromXPath('@value', $xpath, $node, 'string');
+                $value = $this->getValueFromXPath('@value', $xpath, $node);
                 break;
         }
 
@@ -545,12 +592,12 @@ class XmlLegacyLoader implements LoaderInterface
     {
         try {
             $result = $xpath->query($path, $context);
-            if ($result->length === 0) {
+            if (0 === $result->length) {
                 return $default;
             }
 
             $item = $result->item(0);
-            if ($item === null) {
+            if (null === $item) {
                 return $default;
             }
 

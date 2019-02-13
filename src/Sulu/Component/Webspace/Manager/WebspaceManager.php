@@ -154,9 +154,9 @@ class WebspaceManager implements WebspaceManagerInterface
             [RequestAnalyzerInterface::MATCH_TYPE_FULL]
         );
         foreach ($portals as $portalInformation) {
-            $sameLocalization = $portalInformation->getLocalization()->getLocalization() === $languageCode;
-            $sameWebspace = $webspaceKey === null || $portalInformation->getWebspace()->getKey() === $webspaceKey;
-            $url = rtrim(sprintf('%s://%s%s', $scheme, $portalInformation->getUrl(), $resourceLocator), '/');
+            $sameLocalization = $portalInformation->getLocalization()->getLocale() === $languageCode;
+            $sameWebspace = null === $webspaceKey || $portalInformation->getWebspace()->getKey() === $webspaceKey;
+            $url = $this->createResourceLocatorUrl($scheme, $portalInformation->getUrl(), $resourceLocator);
             if ($sameLocalization && $sameWebspace && $this->isFromDomain($url, $domain)) {
                 $urls[] = $url;
             }
@@ -187,11 +187,11 @@ class WebspaceManager implements WebspaceManagerInterface
         );
         foreach ($portals as $portalInformation) {
             $sameLocalization = (
-                $portalInformation->getLocalization() === null
-                || $portalInformation->getLocalization()->getLocalization() === $languageCode
+                null === $portalInformation->getLocalization()
+                || $portalInformation->getLocalization()->getLocale() === $languageCode
             );
-            $sameWebspace = $webspaceKey === null || $portalInformation->getWebspace()->getKey() === $webspaceKey;
-            $url = rtrim(sprintf('%s://%s%s', $scheme, $portalInformation->getUrl(), $resourceLocator), '/');
+            $sameWebspace = null === $webspaceKey || $portalInformation->getWebspace()->getKey() === $webspaceKey;
+            $url = $this->createResourceLocatorUrl($scheme, $portalInformation->getUrl(), $resourceLocator);
             if ($sameLocalization && $sameWebspace && $this->isFromDomain($url, $domain)) {
                 if ($portalInformation->isMain()) {
                     array_unshift($urls, $url);
@@ -293,7 +293,7 @@ class WebspaceManager implements WebspaceManagerInterface
      */
     public function getWebspaceCollection()
     {
-        if ($this->webspaceCollection === null) {
+        if (null === $this->webspaceCollection) {
             $class = $this->options['cache_class'];
             $cache = new ConfigCache(
                 $this->options['cache_dir'] . '/' . $class . '.php',
@@ -386,5 +386,24 @@ class WebspaceManager implements WebspaceManagerInterface
     protected function matchUrl($url, $portalUrl)
     {
         return WildcardUrlUtil::match($url, $portalUrl);
+    }
+
+    /**
+     * Return a valid resource locator url.
+     *
+     * @param string $scheme
+     * @param string $portalUrl
+     * @param string $resourceLocator
+     *
+     * @return string
+     */
+    private function createResourceLocatorUrl($scheme, $portalUrl, $resourceLocator)
+    {
+        if (false !== strpos($portalUrl, '/')) {
+            // trim slash when resourceLocator is not domain root
+            $resourceLocator = rtrim($resourceLocator, '/');
+        }
+
+        return rtrim(sprintf('%s://%s', $scheme, $portalUrl), '/') . $resourceLocator;
     }
 }

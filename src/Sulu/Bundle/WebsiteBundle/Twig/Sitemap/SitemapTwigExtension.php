@@ -68,12 +68,12 @@ class SitemapTwigExtension extends \Twig_Extension implements SitemapTwigExtensi
      */
     public function sitemapUrlFunction($url, $locale = null, $webspaceKey = null)
     {
-        if ($webspaceKey === null) {
+        if (null === $webspaceKey) {
             $webspaceKey = $this->requestAnalyzer->getWebspace()->getKey();
         }
 
-        if ($locale === null) {
-            $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocalization();
+        if (null === $locale) {
+            $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocale();
         }
 
         return $this->webspaceManager->findUrlByResourceLocator(
@@ -89,12 +89,12 @@ class SitemapTwigExtension extends \Twig_Extension implements SitemapTwigExtensi
      */
     public function sitemapFunction($locale = null, $webspaceKey = null)
     {
-        if ($webspaceKey === null) {
+        if (null === $webspaceKey) {
             $webspaceKey = $this->requestAnalyzer->getWebspace()->getKey();
         }
 
-        if ($locale === null) {
-            $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocalization();
+        if (null === $locale) {
+            $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocale();
         }
 
         return $this->sitemapGenerator->generate($webspaceKey, $locale)->getSitemap();

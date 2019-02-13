@@ -15,6 +15,10 @@
             <factory service="doctrine.orm.entity_manager" method="getRepository"/>
 
             <argument type="string">SuluWebsiteBundle:Analytics</argument>
+
+            <call method="setEnvironment">
+                <argument>%kernel.environment%</argument>
+            </call>
         </service>
 
         <service id="sulu_website.domains.repository"
@@ -37,6 +41,7 @@
             <argument type="service" id="sulu_core.webspace.request_analyzer"/>
             <argument type="service" id="sulu_website.analytics.repository"/>
             <argument>%kernel.environment%</argument>
+            <argument type="expression">container.hasParameter('sulu.preview') ? parameter('sulu.preview') : ''</argument>
 
             <tag name="sulu.context" context="website"/>
             <tag name="kernel.event_listener" event="kernel.response" method="onResponse" priority="-5"/>

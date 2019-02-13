@@ -12,6 +12,7 @@
 namespace Sulu\Bundle\MediaBundle\Media\ImageConverter;
 
 use Imagine\Exception\RuntimeException;
+use Imagine\Filter\Basic\Autorotate;
 use Imagine\Image\ImageInterface;
 use Imagine\Image\ImagineInterface;
 use Imagine\Image\Palette\RGB;
@@ -121,6 +122,8 @@ class ImagineImageConverter implements ImageConverterInterface
 
         $image = $this->toRGB($image);
 
+        $image = $this->autorotate($image);
+
         $format = $this->getFormat($formatKey);
 
         $cropParameters = $this->getCropParameters(
@@ -145,7 +148,7 @@ class ImagineImageConverter implements ImageConverterInterface
         $image->strip();
 
         // Set Interlacing to plane for smaller image size.
-        if (count($image->layers()) == 1) {
+        if (1 == count($image->layers())) {
             $image->interlace(ImageInterface::INTERLACE_PLANE);
         }
 
@@ -272,11 +275,25 @@ class ImagineImageConverter implements ImageConverterInterface
      */
     private function toRGB(ImageInterface $image)
     {
-        if ($image->palette()->name() == 'cmyk') {
+        if ('cmyk' == $image->palette()->name()) {
             $image->usePalette(new RGB());
         }
 
         return $image;
+    }
+
+    /**
+     * Autorotate based on metadata of an image.
+     *
+     * @param ImageInterface $image
+     *
+     * @return ImageInterface
+     */
+    private function autorotate(ImageInterface $image)
+    {
+        $autorotateFilter = new Autorotate();
+
+        return $autorotateFilter->apply($image);
     }
 
     /**
@@ -300,12 +317,12 @@ class ImagineImageConverter implements ImageConverterInterface
             ];
 
             if ($this->cropper->isValid(
-                    $image,
-                    $parameters['x'],
-                    $parameters['y'],
-                    $parameters['width'],
-                    $parameters['height'],
-                    $format
+                $image,
+                $parameters['x'],
+                $parameters['y'],
+                $parameters['width'],
+                $parameters['height'],
+                $format
             )
             ) {
                 return $parameters;
@@ -334,7 +351,7 @@ class ImagineImageConverter implements ImageConverterInterface
             foreach ($image->layers() as $layer) {
                 $countLayer += 1;
                 $layer = call_user_func($modifier, $layer);
-                if ($countLayer === 1) {
+                if (1 === $countLayer) {
                     $temporaryImage = $layer; // use first layer as main image
                 } else {
                     $temporaryImage->layers()->add($layer);
@@ -376,7 +393,7 @@ class ImagineImageConverter implements ImageConverterInterface
     private function getOptionsFromImage(ImageInterface $image, $imageExtension, $imagineOptions)
     {
         $options = [];
-        if (count($image->layers()) > 1 && $imageExtension == 'gif') {
+        if (count($image->layers()) > 1 && 'gif' == $imageExtension) {
             $options['animated'] = true;
         }
 

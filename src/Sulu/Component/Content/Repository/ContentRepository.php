@@ -126,13 +126,14 @@ class ContentRepository implements ContentRepositoryInterface
         );
         $this->appendMapping($queryBuilder, $mapping, $locale, $locales);
 
-        $rows = $queryBuilder->execute();
+        $queryResult = $queryBuilder->execute();
 
-        if (count(iterator_to_array($rows->getRows())) !== 1) {
+        $rows = iterator_to_array($queryResult->getRows());
+        if (1 !== count($rows)) {
             throw new ItemNotFoundException();
         }
 
-        return $this->resolveContent($rows->getRows()->current(), $locale, $locales, $mapping, $user);
+        return $this->resolveContent(current($rows), $locale, $locales, $mapping, $user);
     }
 
     /**
@@ -236,7 +237,7 @@ class ContentRepository implements ContentRepositoryInterface
         MappingInterface $mapping,
         UserInterface $user = null
     ) {
-        if (count($uuids) === 0) {
+        if (0 === count($uuids)) {
             return [];
         }
 
@@ -362,7 +363,7 @@ class ContentRepository implements ContentRepositoryInterface
 
         $rows = $queryBuilder->execute();
 
-        if (count(iterator_to_array($rows->getRows())) !== 1) {
+        if (1 !== count(iterator_to_array($rows->getRows()))) {
             throw new ItemNotFoundException();
         }
 
@@ -452,7 +453,7 @@ class ContentRepository implements ContentRepositoryInterface
 
         return array_map(
             function (Localization $localization) {
-                return $localization->getLocalization();
+                return $localization->getLocale();
             },
             $webspace->getAllLocalizations()
         );
@@ -471,7 +472,7 @@ class ContentRepository implements ContentRepositoryInterface
 
         return array_map(
             function (Localization $localization) {
-                return $localization->getLocalization();
+                return $localization->getLocale();
             },
             $portal->getLocalizations()
         );
@@ -486,7 +487,7 @@ class ContentRepository implements ContentRepositoryInterface
     {
         return array_map(
             function (Localization $localization) {
-                return $localization->getLocalization();
+                return $localization->getLocale();
             },
             $this->webspaceManager->getAllLocalizations()
         );
@@ -603,7 +604,7 @@ class ContentRepository implements ContentRepositoryInterface
                 return;
             }
             $type = StructureType::getShadow($row->getValue('shadowBase'));
-        } elseif ($ghostLocale !== null && $ghostLocale !== $originalLocale) {
+        } elseif (null !== $ghostLocale && $ghostLocale !== $originalLocale) {
             if (!$mapping->shouldHydrateGhost()) {
                 return;
             }
@@ -612,9 +613,9 @@ class ContentRepository implements ContentRepositoryInterface
         }
 
         if (
-            $row->getValue('nodeType') === RedirectType::INTERNAL
+            RedirectType::INTERNAL === $row->getValue('nodeType')
             && $mapping->followInternalLink()
-            && $row->getValue('internalLink') !== ''
+            && '' !== $row->getValue('internalLink')
             && $row->getValue('internalLink') !== $row->getValue('uuid')
         ) {
             // TODO collect all internal link contents and query once
@@ -782,7 +783,7 @@ class ContentRepository implements ContentRepositoryInterface
      */
     private function resolveUrl(Row $row, $locale)
     {
-        if ($this->resolveProperty($row, $locale . 'State', $locale) !== WorkflowStage::PUBLISHED) {
+        if (WorkflowStage::PUBLISHED !== $this->resolveProperty($row, $locale . 'State', $locale)) {
             return;
         }
 
@@ -792,7 +793,7 @@ class ContentRepository implements ContentRepositoryInterface
         }
 
         $structure = $this->structureManager->getStructure($template);
-        if (!$structure->hasTag('sulu.rlp')) {
+        if (!$structure || !$structure->hasTag('sulu.rlp')) {
             return;
         }
 

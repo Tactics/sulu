@@ -13,6 +13,7 @@ namespace Sulu\Bundle\WebsiteBundle\Twig\Navigation;
 
 use Sulu\Bundle\WebsiteBundle\Navigation\NavigationMapperInterface;
 use Sulu\Component\Content\Mapper\ContentMapperInterface;
+use Sulu\Component\DocumentManager\Exception\DocumentNotFoundException;
 use Sulu\Component\Webspace\Analyzer\RequestAnalyzerInterface;
 
 /**
@@ -66,7 +67,7 @@ class NavigationTwigExtension extends \Twig_Extension implements NavigationTwigE
     public function flatRootNavigationFunction($context = null, $depth = 1, $loadExcerpt = false)
     {
         $webspaceKey = $this->requestAnalyzer->getWebspace()->getKey();
-        $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocalization();
+        $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocale();
 
         return $this->navigationMapper->getRootNavigation($webspaceKey, $locale, $depth, true, $context, $loadExcerpt);
     }
@@ -77,7 +78,7 @@ class NavigationTwigExtension extends \Twig_Extension implements NavigationTwigE
     public function treeRootNavigationFunction($context = null, $depth = 1, $loadExcerpt = false)
     {
         $webspaceKey = $this->requestAnalyzer->getWebspace()->getKey();
-        $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocalization();
+        $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocale();
 
         return $this->navigationMapper->getRootNavigation($webspaceKey, $locale, $depth, false, $context, $loadExcerpt);
     }
@@ -88,9 +89,9 @@ class NavigationTwigExtension extends \Twig_Extension implements NavigationTwigE
     public function flatNavigationFunction($uuid, $context = null, $depth = 1, $loadExcerpt = false, $level = null)
     {
         $webspaceKey = $this->requestAnalyzer->getWebspace()->getKey();
-        $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocalization();
+        $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocale();
 
-        if ($level !== null) {
+        if (null !== $level) {
             $breadcrumb = $this->contentMapper->loadBreadcrumb(
                 $uuid,
                 $locale,
@@ -105,7 +106,11 @@ class NavigationTwigExtension extends \Twig_Extension implements NavigationTwigE
             $uuid = $breadcrumb[$level]->getUuid();
         }
 
-        return $this->navigationMapper->getNavigation($uuid, $webspaceKey, $locale, $depth, true, $context, $loadExcerpt);
+        try {
+            return $this->navigationMapper->getNavigation($uuid, $webspaceKey, $locale, $depth, true, $context, $loadExcerpt);
+        } catch (DocumentNotFoundException $exception) {
+            return [];
+        }
     }
 
     /**
@@ -114,9 +119,9 @@ class NavigationTwigExtension extends \Twig_Extension implements NavigationTwigE
     public function treeNavigationFunction($uuid, $context = null, $depth = 1, $loadExcerpt = false, $level = null)
     {
         $webspaceKey = $this->requestAnalyzer->getWebspace()->getKey();
-        $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocalization();
+        $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocale();
 
-        if ($level !== null) {
+        if (null !== $level) {
             $breadcrumb = $this->contentMapper->loadBreadcrumb(
                 $uuid,
                 $locale,
@@ -131,7 +136,19 @@ class NavigationTwigExtension extends \Twig_Extension implements NavigationTwigE
             $uuid = $breadcrumb[$level]->getUuid();
         }
 
-        return $this->navigationMapper->getNavigation($uuid, $webspaceKey, $locale, $depth, false, $context, $loadExcerpt);
+        try {
+            return $this->navigationMapper->getNavigation(
+                $uuid,
+                $webspaceKey,
+                $locale,
+                $depth,
+                false,
+                $context,
+                $loadExcerpt
+            );
+        } catch (DocumentNotFoundException $exception) {
+            return [];
+        }
     }
 
     /**
@@ -140,13 +157,13 @@ class NavigationTwigExtension extends \Twig_Extension implements NavigationTwigE
     public function breadcrumbFunction($uuid)
     {
         $webspaceKey = $this->requestAnalyzer->getWebspace()->getKey();
-        $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocalization();
+        $locale = $this->requestAnalyzer->getCurrentLocalization()->getLocale();
 
-        return $this->navigationMapper->getBreadcrumb(
-            $uuid,
-            $webspaceKey,
-            $locale
-        );
+        try {
+            return $this->navigationMapper->getBreadcrumb($uuid, $webspaceKey, $locale);
+        } catch (DocumentNotFoundException $exception) {
+            return [];
+        }
     }
 
     /**

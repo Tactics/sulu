@@ -10,12 +10,13 @@
 require.config({
     paths: {
         sulusnippet: '../../sulusnippet/js',
+        sulusnippetcss: '../../sulusnippet/css',
 
         "type/snippet": '../../sulusnippet/js/validation/type/snippet'
     }
 });
 
-define(['config'], function(Config) {
+define(['config', 'css!sulusnippetcss/main'], function(Config) {
     return {
 
         name: "Sulu Snippet Bundle",
@@ -84,7 +85,13 @@ define(['config'], function(Config) {
             sandbox.mvc.routes.push({
                 route: 'snippet/snippets/:language/edit::id',
                 callback: function(language, id) {
-                    return '<div data-aura-component="snippet/form@sulusnippet" data-aura-language="' + language + '" data-aura-id="' + id + '"/>';
+                    sandbox.emit('sulu.router.navigate', 'snippet/snippets/' + language + '/edit:' + id + '/details');
+                }
+            });
+            sandbox.mvc.routes.push({
+                route: 'snippet/snippets/:language/edit::id/:content',
+                callback: function(language, id) {
+                    return '<div data-aura-component="snippet/form@sulusnippet" data-aura-language="' + language + '" data-aura-id="' + id + '" data-aura-content="' + content + '"/>';
                 }
             });
 

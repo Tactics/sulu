@@ -101,6 +101,7 @@ class WebspaceInitializer implements InitializerInterface
         foreach ($webspaceLocales as $webspaceLocale) {
             if (in_array($webspaceLocale, $existingLocales)) {
                 $output->writeln(sprintf('  [ ] <info>homepage</info>: %s (%s)', $homePath, $webspaceLocale));
+
                 continue;
             }
 
@@ -108,7 +109,8 @@ class WebspaceInitializer implements InitializerInterface
 
             $persistOptions = ['ignore_required' => true];
             if (!$homeDocument) {
-                $homeDocument = new HomeDocument();
+                /** @var HomeDocument $homeDocument */
+                $homeDocument = $this->documentManager->create('home');
                 $persistOptions['path'] = $homePath;
                 $persistOptions['auto_create'] = true;
             } else {
@@ -124,6 +126,7 @@ class WebspaceInitializer implements InitializerInterface
             $this->documentManager->publish($homeDocument, $webspaceLocale);
 
             $routePath = $routesPath . '/' . $webspaceLocale;
+
             try {
                 $routeDocument = $this->documentManager->find($routePath);
             } catch (DocumentNotFoundException $e) {

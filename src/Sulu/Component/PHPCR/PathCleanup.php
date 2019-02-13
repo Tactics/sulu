@@ -57,7 +57,7 @@ class PathCleanup implements PathCleanupInterface
     {
         $replacers = $this->replacers['default'];
 
-        if ($languageCode !== null) {
+        if (null !== $languageCode) {
             $replacers = array_merge(
                 $replacers,
                 (isset($this->replacers[$languageCode]) ? $this->replacers[$languageCode] : [])
@@ -74,7 +74,7 @@ class PathCleanup implements PathCleanupInterface
 
         // Inspired by ZOOLU
         // delete problematic characters
-        $clean = str_replace('%2F', '/', urlencode(preg_replace('/([^A-za-z0-9\s-_\/])/', '', $clean)));
+        $clean = str_replace('%2F', '/', urlencode(preg_replace('/([^A-za-z0-9 -_\/])/', '', $clean)));
 
         // replace multiple dash with one
         $clean = preg_replace('/([-]+)/', '-', $clean);
@@ -101,6 +101,6 @@ class PathCleanup implements PathCleanupInterface
      */
     public function validate($path)
     {
-        return $path === '/' || preg_match($this->pattern, $path) === 1;
+        return '/' === $path || 1 === preg_match($this->pattern, $path);
     }
 }

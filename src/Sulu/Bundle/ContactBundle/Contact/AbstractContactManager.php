@@ -17,16 +17,23 @@ use Sulu\Bundle\ContactBundle\Entity\AccountAddress;
 use Sulu\Bundle\ContactBundle\Entity\AccountContact;
 use Sulu\Bundle\ContactBundle\Entity\AccountInterface;
 use Sulu\Bundle\ContactBundle\Entity\Address;
+use Sulu\Bundle\ContactBundle\Entity\AddressType;
 use Sulu\Bundle\ContactBundle\Entity\BankAccount;
 use Sulu\Bundle\ContactBundle\Entity\Contact;
 use Sulu\Bundle\ContactBundle\Entity\Email;
+use Sulu\Bundle\ContactBundle\Entity\EmailType;
 use Sulu\Bundle\ContactBundle\Entity\Fax;
+use Sulu\Bundle\ContactBundle\Entity\FaxType;
 use Sulu\Bundle\ContactBundle\Entity\Note;
 use Sulu\Bundle\ContactBundle\Entity\Phone;
+use Sulu\Bundle\ContactBundle\Entity\PhoneType;
+use Sulu\Bundle\ContactBundle\Entity\SocialMediaProfile;
+use Sulu\Bundle\ContactBundle\Entity\SocialMediaProfileType;
 use Sulu\Bundle\ContactBundle\Entity\Url;
 use Sulu\Bundle\ContactBundle\Entity\UrlType;
 use Sulu\Bundle\MediaBundle\Media\Manager\MediaManagerInterface;
 use Sulu\Bundle\TagBundle\Tag\TagManagerInterface;
+use Sulu\Component\Contact\Model\ContactInterface;
 use Sulu\Component\Persistence\RelationTrait;
 use Sulu\Component\Rest\Exception\EntityIdAlreadySetException;
 use Sulu\Component\Rest\Exception\EntityNotFoundException;
@@ -43,17 +50,31 @@ abstract class AbstractContactManager implements ContactManagerInterface
     use RelationTrait;
 
     protected static $accountContactEntityName = 'SuluContactBundle:AccountContact';
+
     protected static $positionEntityName = 'SuluContactBundle:Position';
+
     protected static $addressTypeEntityName = 'SuluContactBundle:AddressType';
+
     protected static $urlTypeEntityName = 'SuluContactBundle:UrlType';
+
     protected static $emailTypeEntityName = 'SuluContactBundle:EmailType';
+
     protected static $faxTypeEntityName = 'SuluContactBundle:FaxType';
+
+    protected static $socialMediaProfileTypeEntityName = 'SuluContactBundle:SocialMediaProfileType';
+
     protected static $phoneTypeEntityName = 'SuluContactBundle:PhoneType';
+
     protected static $addressEntityName = 'SuluContactBundle:Address';
+
     protected static $countryEntityName = 'SuluContactBundle:Country';
+
     protected static $emailEntityName = 'SuluContactBundle:Email';
+
     protected static $urlEntityName = 'SuluContactBundle:Url';
+
     protected static $phoneEntityName = 'SuluContactBundle:Phone';
+
     protected static $categoryEntityName = CategoryInterface::class;
 
     /**
@@ -95,7 +116,7 @@ abstract class AbstractContactManager implements ContactManagerInterface
         if ($arrayCollection && !$arrayCollection->isEmpty()) {
             return $arrayCollection->forAll(
                 function ($index, $entry) {
-                    if ($entry->getMain() === true) {
+                    if (true === $entry->getMain()) {
                         $entry->setMain(false);
 
                         return false;
@@ -134,7 +155,7 @@ abstract class AbstractContactManager implements ContactManagerInterface
                 function ($index, $entity) {
                     $mainEntity = $entity;
 
-                    return $entity->getMain() === true;
+                    return true === $entity->getMain();
                 }
             );
         }
@@ -282,77 +303,79 @@ abstract class AbstractContactManager implements ContactManagerInterface
     /**
      * return address type by name.
      *
-     * @param $name
+     * @param string $name
      *
-     * @return mixed
+     * @return AddressType
      */
     public function getAddressTypeByName($name)
     {
-        return $this->em->getRepository(
-            self::$addressTypeEntityName
-        )->findOneByName($name);
+        return $this->em->getRepository(self::$addressTypeEntityName)->findOneByName($name);
     }
 
     /**
      * return url type by name.
      *
-     * @param $name
+     * @param string $name
      *
-     * @return mixed
+     * @return UrlType
      */
     public function getUrlTypeByName($name)
     {
-        return $this->em->getRepository(
-            self::$urlTypeEntityName
-        )->findOneByName($name);
+        return $this->em->getRepository(self::$urlTypeEntityName)->findOneByName($name);
     }
 
     /**
      * return phone type by name.
      *
-     * @param $name
+     * @param string $name
      *
-     * @return mixed
+     * @return PhoneType
      */
     public function getPhoneTypeByName($name)
     {
-        return $this->em->getRepository(
-            self::$phoneTypeEntityName
-        )->findOneByName($name);
+        return $this->em->getRepository(self::$phoneTypeEntityName)->findOneByName($name);
     }
 
     /**
      * return fax type by name.
      *
-     * @param $name
+     * @param string $name
      *
-     * @return mixed
+     * @return FaxType
      */
     public function getFaxTypeByName($name)
     {
-        return $this->em->getRepository(
-            self::$faxTypeEntityName
-        )->findOneByName($name);
+        return $this->em->getRepository(self::$faxTypeEntityName)->findOneByName($name);
+    }
+
+    /**
+     * Return social media profile type by name.
+     *
+     * @param string $name
+     *
+     * @return SocialMediaProfileType
+     */
+    public function getSocialMediaProfileTypeByName($name)
+    {
+        return $this->em->getRepository(self::$socialMediaProfileTypeEntityName)->findOneByName($name);
     }
 
     /**
      * return email type by name.
      *
-     * @param $name
+     * @param string $name
      *
-     * @return mixed
+     * @return EmailType
      */
     public function getEmailTypeByName($name)
     {
-        return $this->em->getRepository(
-            self::$emailTypeEntityName
-        )->findOneByName($name);
+        return $this->em->getRepository(self::$emailTypeEntityName)->findOneByName($name);
     }
 
     /**
      * clears all relational data from entity and deletes it.
      *
-     * @param $entity
+     * @param ContactInterface $entity
      */
     public function deleteAllRelations($entity)
     {
@@ -360,6 +383,7 @@ abstract class AbstractContactManager implements ContactManagerInterface
         $this->deleteAddresses($entity);
         $this->deleteEmails($entity);
         $this->deleteFaxes($entity);
+        $this->deleteSocialMediaProfiles($entity);
         $this->deletePhones($entity);
         $this->deleteUrls($entity);
     }
@@ -367,7 +391,7 @@ abstract class AbstractContactManager implements ContactManagerInterface
     /**
      * deletes all notes that are assigned to entity.
      *
-     * @param $entity
+     * @param ContactInterface $entity
      */
     public function deleteNotes($entity)
     {
@@ -379,7 +403,7 @@ abstract class AbstractContactManager implements ContactManagerInterface
     /**
      * deletes all phones that are assigned to entity.
      *
-     * @param $entity
+     * @param ContactInterface $entity
      */
     public function deletePhones($entity)
     {
@@ -391,7 +415,7 @@ abstract class AbstractContactManager implements ContactManagerInterface
     /**
      * deletes all faxes that are assigned to entity.
      *
-     * @param $entity
+     * @param ContactInterface $entity
      */
     public function deleteFaxes($entity)
     {
@@ -401,9 +425,21 @@ abstract class AbstractContactManager implements ContactManagerInterface
     }
 
     /**
+     * Deletes all social media profiles that are assigned to entity.
+     *
+     * @param ContactInterface $entity
+     */
+    public function deleteSocialMediaProfiles($entity)
+    {
+        if ($entity->getSocialMediaProfiles()) {
+            $this->deleteAllEntitiesOfCollection($entity->getSocialMediaProfiles());
+        }
+    }
+
+    /**
      * deletes all urls that are assigned to entity.
      *
-     * @param $entity
+     * @param ContactInterface $entity
      */
     public function deleteUrls($entity)
     {
@@ -555,7 +591,7 @@ abstract class AbstractContactManager implements ContactManagerInterface
             }
             if ($force) {
                 // return main or first address
-                if ($main === null && $addresses->first()) {
+                if (null === $main && $addresses->first()) {
                     return $addresses->first()->getAddress();
                 }
             }
@@ -588,6 +624,14 @@ abstract class AbstractContactManager implements ContactManagerInterface
                 $this->addFax($contact, $faxData);
             }
             $this->setMainFax($contact);
+        }
+
+        // Social media profiles.
+        $socialMediaProfiles = $this->getProperty($data, 'socialMediaProfiles');
+        if (!empty($socialMediaProfiles)) {
+            foreach ($socialMediaProfiles as $socialMediaProfileData) {
+                $this->addSocialMediaProfile($contact, $socialMediaProfileData);
+            }
         }
 
         // emails
@@ -636,7 +680,7 @@ abstract class AbstractContactManager implements ContactManagerInterface
         }
 
         // process details
-        if ($this->getProperty($data, 'bankAccounts') !== null) {
+        if (null !== $this->getProperty($data, 'bankAccounts')) {
             $this->processBankAccounts($contact, $this->getProperty($data, 'bankAccounts', []));
         }
     }
@@ -1131,6 +1175,108 @@ abstract class AbstractContactManager implements ContactManagerInterface
     }
 
     /**
+     * @param ContactInterface|AccountInterface $contact
+     * @param array $socialMediaProfiles
+     *
+     * @return bool
+     */
+    public function processSocialMediaProfiles($contact, $socialMediaProfiles)
+    {
+        $get = function ($socialMediaProfile) {
+            return $socialMediaProfile->getId();
+        };
+
+        $delete = function ($socialMediaProfile) use ($contact) {
+            $contact->removeSocialMediaProfile($socialMediaProfile);
+
+            return true;
+        };
+
+        $update = function ($socialMediaProfile, $matchedEntry) {
+            return $this->updateSocialMediaProfile($socialMediaProfile, $matchedEntry);
+        };
+
+        $add = function ($socialMediaProfile) use ($contact) {
+            $this->addSocialMediaProfile($contact, $socialMediaProfile);
+
+            return true;
+        };
+
+        $entities = $contact->getSocialMediaProfiles();
+
+        $result = $this->processSubEntities(
+            $entities,
+            $socialMediaProfiles,
+            $get,
+            $add,
+            $update,
+            $delete
+        );
+
+        $this->resetIndexOfSubentites($entities);
+
+        return $result;
+    }
+
+    /**
+     * @param ContactInterface|AccountInterface $contact
+     * @param array $socialMediaProfileData
+     *
+     * @throws EntityIdAlreadySetException
+     * @throws EntityNotFoundException
+     */
+    protected function addSocialMediaProfile($contact, $socialMediaProfileData)
+    {
+        $socialMediaProfileEntity = 'SuluContactBundle:SocialMediaProfile';
+
+        $socialMediaProfileType = $this->em
+            ->getRepository(self::$socialMediaProfileTypeEntityName)
+            ->find($socialMediaProfileData['socialMediaProfileType']['id']);
+
+        if (isset($socialMediaProfileData['id'])) {
+            throw new EntityIdAlreadySetException($socialMediaProfileEntity, $socialMediaProfileData['id']);
+        } elseif (!$socialMediaProfileType) {
+            throw new EntityNotFoundException(
+                self::$socialMediaProfileTypeEntityName,
+                $socialMediaProfileData['socialMediaProfileType']['id']
+            );
+        }
+
+        $socialMediaProfile = new SocialMediaProfile();
+        $socialMediaProfile->setUsername($socialMediaProfileData['username']);
+        $socialMediaProfile->setSocialMediaProfileType($socialMediaProfileType);
+        $this->em->persist($socialMediaProfile);
+        $contact->addSocialMediaProfile($socialMediaProfile);
+    }
+
+    /**
+     * @param SocialMediaProfile $socialMediaProfile
+     * @param array $entry
+     *
+     * @throws EntityNotFoundException
+     *
+     * @return bool
+     */
+    protected function updateSocialMediaProfile(SocialMediaProfile $socialMediaProfile, $entry)
+    {
+        $socialMediaProfileType = $this->em->getRepository(
+            self::$socialMediaProfileTypeEntityName
+        )->find($entry['socialMediaProfileType']['id']);
+
+        if (!$socialMediaProfileType) {
+            throw new EntityNotFoundException(
+                self::$socialMediaProfileTypeEntityName,
+                $entry['socialMediaProfileType']['id']
+            );
+        }
+
+        $socialMediaProfile->setUsername($entry['username']);
+        $socialMediaProfile->setSocialMediaProfileType($socialMediaProfileType);
+
+        return true;
+    }
+
+    /**
      * Creates an address based on the data passed.
      *
      * @param array $addressData
@@ -1165,6 +1311,12 @@ abstract class AbstractContactManager implements ContactManagerInterface
             $address->setCity($addressData['city']);
             $address->setState($addressData['state']);
 
+            if (isset($addressData['latitude'])) {
+                $address->setLatitude('' !== $addressData['latitude'] ? $addressData['latitude'] : null);
+            }
+            if (isset($addressData['longitude'])) {
+                $address->setLongitude('' !== $addressData['longitude'] ? $addressData['longitude'] : null);
+            }
             if (isset($addressData['note'])) {
                 $address->setNote($addressData['note']);
             }
@@ -1243,6 +1395,12 @@ abstract class AbstractContactManager implements ContactManagerInterface
                 $address->setCountry($country);
                 $address->setAddressType($addressType);
 
+                if (isset($entry['latitude'])) {
+                    $address->setLatitude($entry['latitude'] ?: null);
+                }
+                if (isset($entry['longitude'])) {
+                    $address->setLongitude($entry['longitude'] ?: null);
+                }
                 if (isset($entry['note'])) {
                     $address->setNote($entry['note']);
                 }
@@ -1290,11 +1448,11 @@ abstract class AbstractContactManager implements ContactManagerInterface
     protected function getBooleanValue($value)
     {
         if (is_string($value)) {
-            return $value === 'true' ? true : false;
+            return 'true' === $value ? true : false;
         } elseif (is_bool($value)) {
             return $value;
         } elseif (is_numeric($value)) {
-            return $value === 1 ? true : false;
+            return 1 === $value ? true : false;
         }
     }
 
@@ -1635,7 +1793,7 @@ abstract class AbstractContactManager implements ContactManagerInterface
      */
     private function resetIndexOfSubentites($entities)
     {
-        if (count($entities) > 0 && method_exists($entities, 'getValues')) {
+        if ($entities && count($entities) > 0 && method_exists($entities, 'getValues')) {
             $newEntities = $entities->getValues();
             $entities->clear();
             foreach ($newEntities as $value) {

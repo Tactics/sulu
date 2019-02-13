@@ -11,11 +11,13 @@
 
 namespace Sulu\Component\Content\Metadata\Loader;
 
+use Sulu\Component\Content\ContentTypeManagerInterface;
 use Sulu\Component\Content\Metadata\BlockMetadata;
 use Sulu\Component\Content\Metadata\ComponentMetadata;
 use Sulu\Component\Content\Metadata\PropertyMetadata;
 use Sulu\Component\Content\Metadata\SectionMetadata;
 use Sulu\Component\Content\Metadata\StructureMetadata;
+use Sulu\Component\HttpCache\CacheLifetimeResolverInterface;
 use Sulu\Exception\FeatureNotImplementedException;
 use Symfony\Component\Config\Loader\LoaderResolverInterface;
 
@@ -24,6 +26,20 @@ use Symfony\Component\Config\Loader\LoaderResolverInterface;
  */
 class XmlLoader extends XmlLegacyLoader
 {
+    /**
+     * @var ContentTypeManagerInterface
+     */
+    private $contentTypeManager;
+
+    public function __construct(
+        ContentTypeManagerInterface $contentTypeManager,
+        CacheLifetimeResolverInterface $cacheLifetimeResolver
+    ) {
+        parent::__construct($cacheLifetimeResolver);
+
+        $this->contentTypeManager = $contentTypeManager;
+    }
+
     /**
      * {@inheritdoc}
      */
@@ -36,7 +52,8 @@ class XmlLoader extends XmlLegacyLoader
         $structure->name = $data['key'];
         $structure->cacheLifetime = $data['cacheLifetime'];
         $structure->controller = $data['controller'];
-        $structure->internal = $data['internal'] === 'true';
+        $structure->internal = $data['internal'];
+        $structure->areas = $data['areas'];
         $structure->view = $data['view'];
         $structure->tags = $data['tags'];
         $structure->parameters = $data['params'];
@@ -44,7 +61,11 @@ class XmlLoader extends XmlLegacyLoader
         $this->mapMeta($structure, $data['meta']);
 
         foreach ($data['properties'] as $propertyName => $dataProperty) {
-            $structure->children[$propertyName] = $this->createProperty($propertyName, $dataProperty);
+            $property = $this->createProperty($propertyName, $dataProperty);
+
+            if ($property) {
+                $structure->children[$propertyName] = $property;
+            }
         }
 
         $structure->burnProperties();
@@ -54,12 +75,24 @@ class XmlLoader extends XmlLegacyLoader
 
     private function createProperty($propertyName, $propertyData)
     {
-        if ($propertyData['type'] === 'block') {
+        if ('block' === $propertyData['type']) {
             return $this->createBlock($propertyName, $propertyData);
         }
 
-        if ($propertyData['type'] === 'section') {
+        if ('section' === $propertyData['type']) {
             return $this->createSection($propertyName, $propertyData);
+        }
+
+        if (!$this->contentTypeManager->has($propertyData['type'])) {
+            if ('ignore' !== $propertyData['onInvalid']) {
+                throw new \InvalidArgumentException(sprintf(
+                    'Content type with alias "%s" has not been registered. Known content types are: "%s"',
+                    $propertyData['type'],
+                    implode('", "', array_keys($this->contentTypeManager->getAll() ?: []))
+                ));
+            }
+
+            return null;
         }
 
         $property = new PropertyMetadata();
@@ -134,7 +167,7 @@ class XmlLoader extends XmlLegacyLoader
         $property->colSpan = $data['colspan'];
         $property->cssClass = $data['cssClass'];
         $property->tags = $data['tags'];
-        $property->minOccurs = $data['minOccurs'] !== null ? intval($data['minOccurs']) : null;
+        $property->minOccurs = null !== $data['minOccurs'] ? intval($data['minOccurs']) : null;
         $property->maxOccurs = $data['maxOccurs'] ? intval($data['maxOccurs']) : null;
         $property->parameters = $data['params'];
         $this->mapMeta($property, $data['meta']);
@@ -167,6 +200,7 @@ class XmlLoader extends XmlLegacyLoader
                 'controller' => null,
                 'internal' => false,
                 'cacheLifetime' => null,
+                'areas' => [],
             ],
             $this->normalizeItem($data)
         );

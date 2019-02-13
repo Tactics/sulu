@@ -12,13 +12,15 @@
 namespace Sulu\Bundle\PreviewBundle\Tests\Unit\Preview\Renderer;
 
 use Prophecy\Argument;
+use Prophecy\Prophecy\ObjectProphecy;
 use Sulu\Bundle\PreviewBundle\Preview\Events;
 use Sulu\Bundle\PreviewBundle\Preview\Events\PreRenderEvent;
-use Sulu\Bundle\PreviewBundle\Preview\Exception\PortalNotFoundException;
 use Sulu\Bundle\PreviewBundle\Preview\Exception\RouteDefaultsProviderNotFoundException;
 use Sulu\Bundle\PreviewBundle\Preview\Exception\TemplateNotFoundException;
 use Sulu\Bundle\PreviewBundle\Preview\Exception\TwigException;
 use Sulu\Bundle\PreviewBundle\Preview\Exception\UnexpectedException;
+use Sulu\Bundle\PreviewBundle\Preview\Exception\WebspaceLocalizationNotFoundException;
+use Sulu\Bundle\PreviewBundle\Preview\Exception\WebspaceNotFoundException;
 use Sulu\Bundle\PreviewBundle\Preview\Renderer\KernelFactoryInterface;
 use Sulu\Bundle\PreviewBundle\Preview\Renderer\PreviewRenderer;
 use Sulu\Bundle\PreviewBundle\Preview\Renderer\PreviewRendererInterface;
@@ -27,6 +29,8 @@ use Sulu\Component\Localization\Localization;
 use Sulu\Component\Webspace\Manager\WebspaceManagerInterface;
 use Sulu\Component\Webspace\Portal;
 use Sulu\Component\Webspace\PortalInformation;
+use Sulu\Component\Webspace\Url\Replacer;
+use Sulu\Component\Webspace\Url\ReplacerInterface;
 use Sulu\Component\Webspace\Webspace;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -68,6 +72,11 @@ class PreviewRendererTest extends \PHPUnit_Framework_TestCase
     private $eventDispatcher;
 
     /**
+     * @var ReplacerInterface
+     */
+    private $replacer;
+
+    /**
      * @var PreviewRendererInterface
      */
     private $renderer;
@@ -81,6 +90,11 @@ class PreviewRendererTest extends \PHPUnit_Framework_TestCase
      * @var string
      */
     private $environment = 'prod';
+
+    /**
+     * @var string
+     */
+    private $defaultHost = 'default-sulu.io';
 
     public function setUp()
     {
@@ -99,45 +113,52 @@ class PreviewRendererTest extends \PHPUnit_Framework_TestCase
             $this->kernelFactory->reveal(),
             $this->webspaceManager->reveal(),
             $this->eventDispatcher->reveal(),
+            new Replacer(),
             $this->previewDefault,
-            $this->environment
+            $this->environment,
+            $this->defaultHost,
+            'X-Sulu-Target-Group'
         );
     }
 
-    public function testRender()
+    public function portalDataProvider()
     {
-        $object = $this->prophesize(\stdClass::class);
-
-        $portalInformation = $this->prophesize(PortalInformation::class);
-        $webspace = $this->prophesize(Webspace::class);
-        $localization = new Localization('de');
-        $webspace->getLocalization('de')->willReturn($localization);
-        $portalInformation->getWebspace()->willReturn($webspace->reveal());
-        $portalInformation->getPortal()->willReturn($this->prophesize(Portal::class)->reveal());
-        $portalInformation->getUrl()->willReturn('sulu.lo');
-        $portalInformation->getPrefix()->willReturn('/de');
-
-        $this->webspaceManager->findPortalInformationsByWebspaceKeyAndLocale('sulu_io', 'de', $this->environment)
-            ->willReturn([$portalInformation->reveal()]);
-
-        $this->routeDefaultsProvider->supports(get_class($object->reveal()))->willReturn(true);
-        $this->routeDefaultsProvider->getByEntity(get_class($object->reveal()), 1, 'de', $object)
-            ->willReturn(['object' => $object, '_controller' => 'SuluTestBundle:Test:render']);
-
-        $this->eventDispatcher->dispatch(Events::PRE_RENDER, Argument::type(PreRenderEvent::class))
-            ->shouldBeCalled();
-
-        $this->httpKernel->handle(Argument::type(Request::class), HttpKernelInterface::MASTER_REQUEST, false)
-            ->shouldBeCalled()->willReturn(new Response('<title>Hallo</title>'));
-
-        $request = new Request();
-        $this->requestStack->getCurrentRequest()->willReturn($request);
-
-        $response = $this->renderer->render($object->reveal(), 1, 'sulu_io', 'de', true);
-        $this->assertEquals('<title>Hallo</title>', $response);
+        return [
+            [
+                'http',
+                'sulu.lo',
+            ],
+            [
+                'https',
+                'sulu.lo',
+            ],
+            [
+                'http',
+                Replacer::REPLACER_HOST,
+            ],
+            [
+                'https',
+                Replacer::REPLACER_HOST,
+            ],
+        ];
     }
 
-    public function testRenderWithoutRequest()
+    public function portalWithoutRequestDataProvider()
+    {
+        return [
+            [
+                'sulu.lo',
+            ],
+            [
+                Replacer::REPLACER_HOST,
+            ],
+        ];
+    }
+
+    /**
+     * @dataProvider portalDataProvider
+     */
+    public function testRender($scheme, $portalUrl)
     {
         $object = $this->prophesize(\stdClass::class);
 
@@ -147,7 +168,7 @@ class PreviewRendererTest extends \PHPUnit_Framework_TestCase
         $webspace->getLocalization('de')->willReturn($localization);
         $portalInformation->getWebspace()->willReturn($webspace->reveal());
         $portalInformation->getPortal()->willReturn($this->prophesize(Portal::class)->reveal());
-        $portalInformation->getUrl()->willReturn('sulu.lo');
+        $portalInformation->getUrl()->willReturn($portalUrl);
         $portalInformation->getPrefix()->willReturn('/de');
 
         $this->webspaceManager->findPortalInformationsByWebspaceKeyAndLocale('sulu_io', 'de', $this->environment)
@@ -159,46 +180,191 @@ class PreviewRendererTest extends \PHPUnit_Framework_TestCase
 
         $this->eventDispatcher->dispatch(Events::PRE_RENDER, Argument::type(PreRenderEvent::class))
             ->shouldBeCalled();
+
+        $this->render($object, $scheme, $portalUrl);
+    }
+
+    /**
+     * @param ObjectProphecy $object
+     * @param string $expectedScheme
+     * @param string $expectedHost
+     * @param int $expectedPort
+     * @param bool $hasRequest
+     */
+    protected function render(
+        ObjectProphecy $object,
+        $expectedScheme = 'http',
+        $expectedHost = 'sulu.lo',
+        $expectedPort = 8080,
+        $hasRequest = true
+    ) {
+        $server = [
+            'SERVER_NAME' => 'admin-sulu.io',
+            'HTTP_HOST' => 'admin-sulu.io:' . $expectedPort,
+            'SERVER_PORT' => $expectedPort,
+        ];
+
+        if ('https' === $expectedScheme) {
+            $server['HTTPS'] = true;
+        }
+
+        if (Replacer::REPLACER_HOST === $expectedHost && $hasRequest) {
+            $expectedHost = 'admin-sulu.io';
+        } elseif (Replacer::REPLACER_HOST === $expectedHost) {
+            $expectedHost = $this->defaultHost;
+        }
 
         $this->httpKernel->handle(
             Argument::that(
-                function (Request $request) {
-                    return null !== $request->get('_sulu');
+                function (Request $request) use ($expectedScheme, $expectedHost, $expectedPort) {
+                    return $request->getHost() === $expectedHost
+                        && $request->getPort() === $expectedPort
+                        && $request->getScheme() === $expectedScheme;
                 }
             ),
             HttpKernelInterface::MASTER_REQUEST,
             false
         )->shouldBeCalled()->willReturn(new Response('<title>Hallo</title>'));
 
-        $this->requestStack->getCurrentRequest()->willReturn(null);
+        $request = null;
+
+        if ($hasRequest) {
+            $request = new Request([], [], [], [], [], $server);
+        }
+
+        $this->requestStack->getCurrentRequest()->willReturn($request);
 
         $response = $this->renderer->render($object->reveal(), 1, 'sulu_io', 'de', true);
         $this->assertEquals('<title>Hallo</title>', $response);
     }
 
+    public function testRenderWithTargetGroup()
+    {
+        $object = $this->prophesize(\stdClass::class);
+
+        $portalInformation = $this->prophesize(PortalInformation::class);
+        $webspace = $this->prophesize(Webspace::class);
+        $localization = new Localization('de');
+        $webspace->getLocalization('de')->willReturn($localization);
+        $portalInformation->getWebspace()->willReturn($webspace->reveal());
+        $portalInformation->getPortal()->willReturn($this->prophesize(Portal::class)->reveal());
+        $portalInformation->getUrl()->willReturn('sulu.lo');
+        $portalInformation->getPrefix()->willReturn('/de');
+
+        $this->webspaceManager->findPortalInformationsByWebspaceKeyAndLocale('sulu_io', 'de', $this->environment)
+            ->willReturn([$portalInformation->reveal()]);
+
+        $this->routeDefaultsProvider->supports(get_class($object->reveal()))->willReturn(true);
+        $this->routeDefaultsProvider->getByEntity(get_class($object->reveal()), 1, 'de', $object)
+            ->willReturn(['object' => $object, '_controller' => 'SuluTestBundle:Test:render']);
+
+        $this->eventDispatcher->dispatch(Events::PRE_RENDER, Argument::type(PreRenderEvent::class))
+            ->shouldBeCalled();
+
+        $request = new Request();
+        $this->requestStack->getCurrentRequest()->willReturn($request);
+
+        $this->httpKernel->handle(Argument::type(Request::class), HttpKernelInterface::MASTER_REQUEST, false)
+            ->shouldBeCalled()->willReturn(new Response('<title>Hallo</title>'));
+
+        $response = $this->renderer->render($object->reveal(), 1, 'sulu_io', 'de', true, 2);
+        $this->assertEquals('<title>Hallo</title>', $response);
+    }
+
+    /**
+     * @dataProvider portalWithoutRequestDataProvider
+     */
+    public function testRenderWithoutRequest($portalUrl)
+    {
+        $object = $this->prophesize(\stdClass::class);
+
+        $portalInformation = $this->prophesize(PortalInformation::class);
+        $webspace = $this->prophesize(Webspace::class);
+        $localization = new Localization('de');
+        $webspace->getLocalization('de')->willReturn($localization);
+        $portalInformation->getWebspace()->willReturn($webspace->reveal());
+        $portalInformation->getPortal()->willReturn($this->prophesize(Portal::class)->reveal());
+        $portalInformation->getUrl()->willReturn($portalUrl);
+        $portalInformation->getPrefix()->willReturn('/de');
+
+        $this->webspaceManager->findPortalInformationsByWebspaceKeyAndLocale('sulu_io', 'de', $this->environment)
+            ->willReturn([$portalInformation->reveal()]);
+
+        $this->routeDefaultsProvider->supports(get_class($object->reveal()))->willReturn(true);
+        $this->routeDefaultsProvider->getByEntity(get_class($object->reveal()), 1, 'de', $object)
+            ->willReturn(['object' => $object, '_controller' => 'SuluTestBundle:Test:render']);
+
+        $this->eventDispatcher->dispatch(Events::PRE_RENDER, Argument::type(PreRenderEvent::class))
+            ->shouldBeCalled();
+
+        $this->render($object, 'http', $portalUrl, 80, false);
+    }
+
     public function testRenderPortalNotFound()
     {
-        $this->setExpectedException(PortalNotFoundException::class, '', 9901);
-
         $object = $this->prophesize(\stdClass::class);
 
         $this->webspaceManager->findPortalInformationsByWebspaceKeyAndLocale('sulu_io', 'de', $this->environment)
             ->willReturn([]);
 
-        $this->routeDefaultsProvider->supports(get_class($object->reveal()))->shouldNotBeCalled();
+        $webspace = new Webspace();
+        $localization = new Localization('de');
+        $webspace->addLocalization($localization);
+        $this->webspaceManager->findWebspaceByKey('sulu_io')->willReturn($webspace);
+
+        $this->routeDefaultsProvider->supports(get_class($object->reveal()))->willReturn(true);
         $this->routeDefaultsProvider->getByEntity(get_class($object->reveal()), 1, 'de', $object)
-            ->shouldNotBeCalled();
+            ->willReturn(['object' => $object, '_controller' => 'SuluTestBundle:Test:render']);
 
         $this->eventDispatcher->dispatch(Events::PRE_RENDER, Argument::type(PreRenderEvent::class))
-            ->shouldNotBeCalled();
+            ->shouldBeCalled();
 
         $this->httpKernel->handle(Argument::type(Request::class), HttpKernelInterface::MASTER_REQUEST, false)
-            ->shouldNotBeCalled();
+            ->willReturn(new Response('<title>Hallo</title>'));
 
         $request = new Request();
         $this->requestStack->getCurrentRequest()->willReturn($request);
 
-        $this->renderer->render($object->reveal(), 1, 'sulu_io', 'de', true);
+        $response = $this->renderer->render($object->reveal(), 1, 'sulu_io', 'de', true);
+
+        $this->assertEquals('<title>Hallo</title>', $response);
+    }
+
+    public function testRenderWebspaceNotFound()
+    {
+        $this->setExpectedException(WebspaceNotFoundException::class);
+        $object = new \stdClass();
+
+        $request = new Request();
+        $this->requestStack->getCurrentRequest()->willReturn($request);
+
+        $this->routeDefaultsProvider->supports(get_class($object))->willReturn(true);
+
+        $this->webspaceManager->findPortalInformationsByWebspaceKeyAndLocale('not_existing', 'de', $this->environment)
+            ->willReturn([]);
+
+        $this->webspaceManager->findWebspaceByKey('not_existing')->willReturn(null);
+
+        $this->renderer->render($object, 1, 'not_existing', 'de', true);
+    }
+
+    public function testRenderWebspaceLocalizationNotFound()
+    {
+        $this->setExpectedException(WebspaceLocalizationNotFoundException::class);
+
+        $request = new Request();
+        $this->requestStack->getCurrentRequest()->willReturn($request);
+
+        $object = new \stdClass();
+        $this->routeDefaultsProvider->supports(get_class($object))->willReturn(true);
+
+        $this->webspaceManager->findPortalInformationsByWebspaceKeyAndLocale('sulu_io', 'de', $this->environment)
+            ->willReturn([]);
+
+        $webspace = new Webspace();
+        $this->webspaceManager->findWebspaceByKey('sulu_io')->willReturn($webspace);
+
+        $this->renderer->render($object, 1, 'sulu_io', 'de', true);
     }
 
     public function testRenderRouteDefaultsProviderNotFound()
@@ -370,6 +536,80 @@ class PreviewRendererTest extends \PHPUnit_Framework_TestCase
             );
 
         $request = new Request();
+        $this->requestStack->getCurrentRequest()->willReturn($request);
+
+        $this->renderer->render($object->reveal(), 1, 'sulu_io', 'de', true);
+    }
+
+    public function testRenderRequestWithServerAttributes()
+    {
+        $object = $this->prophesize(\stdClass::class);
+
+        $portalInformation = $this->prophesize(PortalInformation::class);
+        $webspace = $this->prophesize(Webspace::class);
+        $localization = new Localization('de');
+        $webspace->getLocalization('de')->willReturn($localization);
+        $portalInformation->getWebspace()->willReturn($webspace->reveal());
+        $portalInformation->getPortal()->willReturn($this->prophesize(Portal::class)->reveal());
+        $portalInformation->getUrl()->willReturn('{host}');
+        $portalInformation->getPrefix()->willReturn('/de');
+
+        $this->webspaceManager->findPortalInformationsByWebspaceKeyAndLocale('sulu_io', 'de', $this->environment)
+            ->willReturn([$portalInformation->reveal()]);
+
+        $this->routeDefaultsProvider->supports(get_class($object->reveal()))->willReturn(true);
+        $this->routeDefaultsProvider->getByEntity(get_class($object->reveal()), 1, 'de', $object)
+            ->willReturn(['object' => $object, '_controller' => 'SuluTestBundle:Test:render']);
+
+        $this->eventDispatcher->dispatch(Events::PRE_RENDER, Argument::type(PreRenderEvent::class))
+            ->shouldBeCalled();
+
+        $server = [
+            'SERVER_NAME' => 'sulu-preview-test.io',
+            'HOST_NAME' => 'sulu-preview-test.io',
+            'SERVER_PORT' => 8080,
+            'X-Forwarded-Host' => 'forwarded.sulu.io',
+            'X-Forwarded-Proto' => 'https',
+            'X-Forwarded-Port' => 8081,
+            'HTTP_X_REQUESTED_WITH' => 'XmlHttpRequest',
+            'HTTP_USER_AGENT' => 'Sulu/Preview',
+            'HTTP_ACCEPT_LANGUAGE' => 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+        ];
+
+        $this->httpKernel->handle(
+            Argument::that(
+                function (Request $request) use ($server) {
+                    foreach ($server as $key => $expectedValue) {
+                        $value = $request->server->get($key);
+
+                        if ('HTTP_X_REQUESTED_WITH' === $key) {
+                            $expectedValue = null;
+                        }
+
+                        $this->assertEquals(
+                            $expectedValue,
+                            $value,
+                            sprintf(
+                                'Expected for $_SERVER["%s"]: "%s" but "%s" was given',
+                                $key,
+                                $expectedValue,
+                                $value
+                            )
+                        );
+                    }
+
+                    $this->assertTrue($request->attributes->get('preview'));
+                    $this->assertTrue($request->attributes->get('partial'));
+
+                    // Assert equals will throw exception so also true can be returned.
+                    return true;
+                }
+            ),
+            HttpKernelInterface::MASTER_REQUEST,
+            false
+        )->shouldBeCalled()->willReturn(new Response('<title>Hallo</title>'));
+
+        $request = new Request([], [], [], [], [], $server, []);
         $this->requestStack->getCurrentRequest()->willReturn($request);
 
         $this->renderer->render($object->reveal(), 1, 'sulu_io', 'de', true);

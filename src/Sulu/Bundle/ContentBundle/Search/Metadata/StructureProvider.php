@@ -20,10 +20,13 @@ use Massive\Bundle\SearchBundle\Search\Metadata\IndexMetadata;
 use Massive\Bundle\SearchBundle\Search\Metadata\IndexMetadataInterface;
 use Massive\Bundle\SearchBundle\Search\Metadata\ProviderInterface;
 use Sulu\Component\Content\Document\Behavior\ExtensionBehavior;
+use Sulu\Component\Content\Document\Behavior\LocalizedAuthorBehavior;
+use Sulu\Component\Content\Document\Behavior\RedirectTypeBehavior;
 use Sulu\Component\Content\Document\Behavior\ResourceSegmentBehavior;
 use Sulu\Component\Content\Document\Behavior\StructureBehavior;
 use Sulu\Component\Content\Document\Behavior\WebspaceBehavior;
 use Sulu\Component\Content\Document\Behavior\WorkflowStageBehavior;
+use Sulu\Component\Content\Document\RedirectType;
 use Sulu\Component\Content\Document\WorkflowStage;
 use Sulu\Component\Content\Extension\ExtensionManagerInterface;
 use Sulu\Component\Content\Metadata\BlockMetadata;
@@ -40,7 +43,9 @@ use Sulu\Component\DocumentManager\Metadata\MetadataFactory;
 class StructureProvider implements ProviderInterface
 {
     const FIELD_STRUCTURE_TYPE = '_structure_type';
+
     const FIELD_TEASER_DESCRIPTION = '_teaser_description';
+
     const FIELD_TEASER_MEDIA = '_teaser_media';
 
     /**
@@ -118,9 +123,10 @@ class StructureProvider implements ProviderInterface
 
         $indexMeta = $this->factory->createIndexMetadata();
         $indexMeta->setIdField($this->factory->createMetadataField('uuid'));
-        $indexMeta->setLocaleField($this->factory->createMetadataField('locale'));
+        $indexMeta->setLocaleField($this->factory->createMetadataField('originalLocale'));
 
         $indexName = 'page';
+        $decorate = false;
 
         // See if the mapping overrides the default index and category name
         foreach ($this->mapping as $className => $mapping) {
@@ -132,20 +138,12 @@ class StructureProvider implements ProviderInterface
             }
 
             $indexName = $mapping['index'];
+            if ($mapping['decorate_index']) {
+                $decorate = true;
+            }
         }
 
-        if ($indexName === 'page') {
-            $indexMeta->setIndexName(
-                new Expression(
-                    sprintf(
-                        '"page_"~object.getWebspaceName()~(object.getWorkflowStage() == %s ? "_published" : "")',
-                        WorkflowStage::PUBLISHED
-                    )
-                )
-            );
-        } else {
-            $indexMeta->setIndexName(new Value($indexName));
-        }
+        $indexMeta->setIndexName($this->createIndexNameField($documentMetadata, $indexName, $decorate));
 
         foreach ($structure->getProperties() as $property) {
             if ($property instanceof BlockMetadata) {
@@ -159,7 +157,7 @@ class StructureProvider implements ProviderInterface
                         $tag = $componentProperty->getTag('sulu.search.field');
                         $tagAttributes = $tag['attributes'];
 
-                        if (!isset($tagAttributes['index']) || $tagAttributes['index'] !== 'false') {
+                        if (!isset($tagAttributes['index']) || 'false' !== $tagAttributes['index']) {
                             $propertyMapping->addFieldMapping(
                                 $property->getName() . '.' . $componentProperty->getName(),
                                 [
@@ -198,7 +196,28 @@ class StructureProvider implements ProviderInterface
         }
 
         if ($class->isSubclassOf(ResourceSegmentBehavior::class)) {
-            $indexMeta->setUrlField($this->factory->createMetadataField('resourceSegment'));
+            $field = $this->factory->createMetadataField('resourceSegment');
+            if ($class->isSubclassOf(RedirectTypeBehavior::class)) {
+                $expression = <<<'EOT'
+                    (object.getRedirectType() === %s
+                        ? (object.getRedirectTarget() ? object.getRedirectTarget().getResourceSegment()) 
+                        : (object.getRedirectType() === %s 
+                            ? object.getRedirectExternal() 
+                            : object.getResourceSegment()
+                        )
+                    )
+EOT;
+
+                $field = new Expression(
+                    sprintf(
+                        $expression,
+                        RedirectType::INTERNAL,
+                        RedirectType::EXTERNAL
+                    )
+                );
+            }
+
+            $indexMeta->setUrlField($field);
         }
 
         if (!$indexMeta->getTitleField()) {
@@ -244,6 +263,18 @@ class StructureProvider implements ProviderInterface
                     'type' => 'date',
                     'field' => $this->factory->createMetadataExpression(
                         'object.getPublished()'
+                    ),
+                ]
+            );
+        }
+
+        if ($class->isSubclassOf(LocalizedAuthorBehavior::class)) {
+            $indexMeta->addFieldMapping(
+                'authored',
+                [
+                    'type' => 'date',
+                    'field' => $this->factory->createMetadataExpression(
+                        'object.getAuthored()'
                     ),
                 ]
             );
@@ -361,7 +392,7 @@ class StructureProvider implements ProviderInterface
             return;
         }
 
-        if (!isset($tagAttributes['index']) || $tagAttributes['index'] !== 'false') {
+        if (!isset($tagAttributes['index']) || 'false' !== $tagAttributes['index']) {
             $metadata->addFieldMapping(
                 $property->getName(),
                 [
@@ -410,5 +441,22 @@ class StructureProvider implements ProviderInterface
                 'indexed' => false,
             ]
         );
+    }
+
+    private function createIndexNameField(Metadata $documentMetadata, $indexName, $decorate)
+    {
+        if (!$decorate) {
+            return new Value($indexName);
+        }
+
+        $expression = '"' . $indexName . '"';
+        if ($documentMetadata->getReflectionClass()->isSubclassOf(WebspaceBehavior::class)) {
+            $expression .= '~"_"~object.getWebspaceName()';
+        }
+        if ($documentMetadata->getReflectionClass()->isSubclassOf(WorkflowStageBehavior::class)) {
+            $expression .= '~(object.getWorkflowStage() == ' . WorkflowStage::PUBLISHED . ' ? "_published" : "")';
+        }
+
+        return new Expression($expression);
     }
 }

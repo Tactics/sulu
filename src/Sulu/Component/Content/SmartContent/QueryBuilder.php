@@ -63,6 +63,11 @@ class QueryBuilder extends ContentQueryBuilder
      */
     private $sessionManager;
 
+    /**
+     * @var string
+     */
+    protected static $structureType = Structure::TYPE_PAGE;
+
     public function __construct(
         StructureManagerInterface $structureManager,
         ExtensionManagerInterface $extensionManager,
@@ -83,11 +88,22 @@ class QueryBuilder extends ContentQueryBuilder
         // build where clause for datasource
         if ($this->hasConfig('dataSource')) {
             $sql2Where[] = $this->buildDatasourceWhere();
-        } elseif (count($this->ids) === 0) {
+        } elseif (0 === count($this->ids)) {
             $sql2Where[] = sprintf(
                 'ISDESCENDANTNODE(page, "/cmf/%s/contents")',
                 $webspaceKey
             );
+        }
+
+        if ($this->hasConfig('audienceTargeting')
+            && $this->getConfig('audienceTargeting', false)
+            && $this->hasConfig('targetGroupId')
+        ) {
+            $result = $this->buildAudienceTargeting($this->getConfig('targetGroupId'), $locale);
+
+            if ($result) {
+                $sql2Where[] = $result;
+            }
         }
 
         // build where clause for tags
@@ -158,7 +174,7 @@ class QueryBuilder extends ContentQueryBuilder
      */
     protected function buildOrder($webspaceKey, $locale)
     {
-        $sortOrder = (isset($this->config['sortMethod']) && strtolower($this->config['sortMethod']) === 'desc')
+        $sortOrder = (isset($this->config['sortMethod']) && 'desc' === strtolower($this->config['sortMethod']))
             ? 'DESC' : 'ASC';
 
         $sql2Order = [];
@@ -202,7 +218,7 @@ class QueryBuilder extends ContentQueryBuilder
             $alias = $parameter->getName();
             $propertyName = $parameter->getValue();
 
-            if (strpos($propertyName, '.') !== false) {
+            if (false !== strpos($propertyName, '.')) {
                 $parts = explode('.', $propertyName);
 
                 $this->buildExtensionSelect($alias, $parts[0], $parts[1], $locale, $additionalFields);
@@ -217,7 +233,7 @@ class QueryBuilder extends ContentQueryBuilder
      */
     private function buildPropertySelect($alias, $propertyName, $locale, &$additionalFields)
     {
-        foreach ($this->structureManager->getStructures(Structure::TYPE_PAGE) as $structure) {
+        foreach ($this->structureManager->getStructures(static::$structureType) as $structure) {
             if ($structure->hasProperty($propertyName)) {
                 $property = $structure->getProperty($propertyName);
                 $additionalFields[$locale][] = [
@@ -249,12 +265,38 @@ class QueryBuilder extends ContentQueryBuilder
     {
         $dataSource = $this->getConfig('dataSource');
         $includeSubFolders = $this->getConfig('includeSubFolders', false);
-        $sqlFunction = $includeSubFolders !== false && $includeSubFolders !== 'false' ?
+        $sqlFunction = false !== $includeSubFolders && 'false' !== $includeSubFolders ?
             'ISDESCENDANTNODE' : 'ISCHILDNODE';
 
         $node = $this->sessionManager->getSession()->getNodeByIdentifier($dataSource);
 
         return $sqlFunction . '(page, \'' . $node->getPath() . '\')';
+    }
+
+    /**
+     * Returns the where part for the audience targeting.
+     *
+     * @param string $targetGroupId
+     * @param string $locale
+     *
+     * @return string
+     */
+    private function buildAudienceTargeting($targetGroupId, $locale)
+    {
+        if (!$targetGroupId) {
+            return;
+        }
+
+        $structure = $this->structureManager->getStructure('excerpt');
+
+        $property = new TranslatedProperty(
+            $structure->getProperty('audience_targeting_groups'),
+            $locale,
+            $this->languageNamespace,
+            'excerpt'
+        );
+
+        return 'page.[' . $property->getName() . '] = ' . $targetGroupId;
     }
 
     /**
@@ -319,7 +361,7 @@ class QueryBuilder extends ContentQueryBuilder
      *
      * @return bool
      */
-    private function hasConfig($name)
+    protected function hasConfig($name)
     {
         return isset($this->config[$name]);
     }
@@ -332,7 +374,7 @@ class QueryBuilder extends ContentQueryBuilder
      *
      * @return mixed config value
      */
-    private function getConfig($name, $default = null)
+    protected function getConfig($name, $default = null)
     {
         if (!$this->hasConfig($name)) {
             return $default;
@@ -361,7 +403,7 @@ class QueryBuilder extends ContentQueryBuilder
     {
         $idsWhere = [];
         foreach ($this->excluded as $id) {
-            $idsWhere[] = sprintf("NOT (page.[jcr:uuid] = '%s')", $id);
+            $idsWhere[] = sprintf("(NOT page.[jcr:uuid] = '%s')", $id);
         }
 
         return $idsWhere;

@@ -7,7 +7,7 @@
  * with this source code in the file LICENSE.
  */
 
-define(['app-config'], function(AppConfig) {
+define(['app-config','services/sulucontent/smart-content-manager'], function(AppConfig,SmartContentManager) {
 
     'use strict';
 
@@ -20,6 +20,7 @@ define(['app-config'], function(AppConfig) {
         },
 
         initialize: function() {
+            SmartContentManager.initialize();
             this.bindCustomEvents();
             this.config = AppConfig.getSection('sulu-snippet');
             this.defaultType = this.config.defaultType;
@@ -34,7 +35,7 @@ define(['app-config'], function(AppConfig) {
             }, this);
 
             // content save
-            this.sandbox.on('sulu.toolbar.save', function(action) {
+            this.sandbox.on('sulu.tab.save', function(action) {
                 this.submit(action);
             }, this);
         },
@@ -157,6 +158,8 @@ define(['app-config'], function(AppConfig) {
                     this.initSortableBlock();
                     this.bindFormEvents();
 
+                    this.sandbox.emit('sulu.content.initialized', data);
+
                     dfd.resolve();
                 }.bind(this));
             }.bind(this));
@@ -184,7 +187,7 @@ define(['app-config'], function(AppConfig) {
         bindFormEvents: function() {
             this.sandbox.dom.on(this.formId, 'form-remove', function() {
                 this.initSortableBlock();
-                this.setHeaderBar(false);
+                this.sandbox.emit('sulu.tab.dirty');
             }.bind(this));
 
             this.sandbox.dom.on(this.formId, 'form-add', function(e, propertyName, data, index) {
@@ -207,24 +210,14 @@ define(['app-config'], function(AppConfig) {
 
         listenForChange: function() {
             this.sandbox.dom.on(this.$el, 'keyup change', function() {
-                this.setHeaderBar(false);
+                this.sandbox.emit('sulu.tab.dirty');
                 this.contentChanged = true;
             }.bind(this), '.trigger-save-button');
 
             this.sandbox.on('sulu.content.changed', function() {
-                this.setHeaderBar(false);
+                this.sandbox.emit('sulu.tab.dirty');
                 this.contentChanged = true;
             }.bind(this));
-        },
-
-        setHeaderBar: function(saved) {
-            // FIXME add event
-            this.sandbox.emit('sulu.snippets.snippet.set-header-bar', saved);
-
-            this.saved = saved;
-            if (this.saved) {
-                this.contentChanged = false;
-            }
         },
 
         getTemplateUrl: function(item) {

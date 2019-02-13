@@ -51,7 +51,6 @@ abstract class ContentQueryBuilder implements ContentQueryBuilderInterface
         'template',
         'changed',
         'changer',
-        'created',
         'creator',
         'created',
         'nodeType',
@@ -78,6 +77,8 @@ abstract class ContentQueryBuilder implements ContentQueryBuilderInterface
      */
     protected $excerpt = true;
 
+    protected static $mixinTypes = ['sulu:page', 'sulu:home'];
+
     public function __construct(
         StructureManagerInterface $structureManager,
         ExtensionManagerInterface $extensionManager,
@@ -87,7 +88,7 @@ abstract class ContentQueryBuilder implements ContentQueryBuilderInterface
         $this->extensionManager = $extensionManager;
         $this->languageNamespace = $languageNamespace;
 
-        $properties = array_merge($this->defaultProperties, $this->properties);
+        $properties = array_unique(array_merge($this->defaultProperties, $this->properties));
         $this->translatedProperties = new MultipleTranslatedProperties($properties, $this->languageNamespace);
     }
 
@@ -129,14 +130,14 @@ abstract class ContentQueryBuilder implements ContentQueryBuilderInterface
             }
 
             $customSelect = $this->buildSelect($webspaceKey, $locale, $additionalFields);
-            if ($customSelect !== '') {
+            if ('' !== $customSelect) {
                 $select[] = $customSelect;
             }
 
             if ($this->published) {
                 $where .= sprintf(
                     '%s ((page.[%s] = %s OR page.[%s] = %s)',
-                    $where !== '' ? 'OR ' : '',
+                    '' !== $where ? 'OR ' : '',
                     $this->getPropertyName('state'),
                     Structure::STATE_PUBLISHED,
                     $this->getPropertyName('shadow-on'),
@@ -145,8 +146,8 @@ abstract class ContentQueryBuilder implements ContentQueryBuilderInterface
             }
 
             $customWhere = $this->buildWhere($webspaceKey, $locale);
-            if ($customWhere !== null && $customWhere !== '') {
-                $where = $where . ($where !== '' ? ' AND ' : '') . $customWhere;
+            if (null !== $customWhere && '' !== $customWhere) {
+                $where = $where . ('' !== $where ? ' AND ' : '') . $customWhere;
             }
 
             if ($this->published) {
@@ -161,14 +162,18 @@ abstract class ContentQueryBuilder implements ContentQueryBuilderInterface
             }
         }
 
-        // build sql2 query string
+        $mixinTypeWhere = implode(' OR ', array_map(function($mixinType) {
+            return 'page.[jcr:mixinTypes] = "' . $mixinType . '"';
+        }, static::$mixinTypes));
+
         $sql2 = sprintf(
-            "SELECT %s
+            'SELECT %s
              FROM [nt:unstructured] AS page
-             WHERE (page.[jcr:mixinTypes] = 'sulu:page' OR page.[jcr:mixinTypes] = 'sulu:home')
+             WHERE (%s)
                 AND (%s)
-                %s %s",
+                %s %s',
             implode(', ', $select),
+            $mixinTypeWhere,
             $where,
             count($order) > 0 ? 'ORDER BY' : '',
             implode(', ', $order)
@@ -236,7 +241,7 @@ abstract class ContentQueryBuilder implements ContentQueryBuilderInterface
             $urlProperty = $structure->getPropertyByTagName('sulu.rlp');
             $name = $this->getTranslatedProperty($urlProperty, $locale)->getName();
 
-            if ($urlProperty->getContentTypeName() !== 'resource_locator' && !in_array($name, $names)) {
+            if ('resource_locator' !== $urlProperty->getContentTypeName() && !in_array($name, $names)) {
                 $names[] = $name;
                 $result .= ', ' . $this->buildSelector($name);
             }

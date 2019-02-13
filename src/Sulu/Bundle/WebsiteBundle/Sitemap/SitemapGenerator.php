@@ -65,7 +65,7 @@ class SitemapGenerator implements SitemapGeneratorInterface
     {
         $webspaceSitemapInformation = $this->getWebspaceSitemap($webspaceKey);
         $sitemap = $this->generateByLocals($webspaceKey, [$locale], $flat);
-        if (count($sitemap) === 1 && !$flat) {
+        if (1 === count($sitemap) && !$flat) {
             $sitemap = $sitemap[0];
         }
         $webspaceSitemapInformation->setSitemap(
@@ -89,10 +89,10 @@ class SitemapGenerator implements SitemapGeneratorInterface
 
         $defaultLocalization = $webspace->getDefaultLocalization();
         if ($defaultLocalization) {
-            $webspaceSitemap->setDefaultLocalization($defaultLocalization->getLocalization());
+            $webspaceSitemap->setDefaultLocalization($defaultLocalization->getLocale());
         }
         foreach ($webspace->getAllLocalizations() as $localization) {
-            $webspaceSitemap->addLocalization($localization->getLocalization());
+            $webspaceSitemap->addLocalization($localization->getLocale());
         }
 
         return $webspaceSitemap;

@@ -41,7 +41,7 @@ class RedirectEnhancer extends AbstractEnhancer
         Request $request
     ) {
         $resourceSegment = '/';
-        if ($customUrl->getTargetDocument() !== null) {
+        if (null !== $customUrl->getTargetDocument()) {
             $resourceSegment = $customUrl->getTargetDocument()->getResourceSegment();
         }
 
@@ -51,6 +51,10 @@ class RedirectEnhancer extends AbstractEnhancer
             $customUrl->getTargetLocale(),
             $defaults['_webspace']->getKey()
         );
+
+        if ($request->getQueryString()) {
+            $url .= '?' . $request->getQueryString();
+        }
 
         return [
             '_controller' => 'SuluWebsiteBundle:Redirect:redirect',
@@ -63,6 +67,6 @@ class RedirectEnhancer extends AbstractEnhancer
      */
     protected function supports(CustomUrlBehavior $customUrl)
     {
-        return $customUrl->isRedirect() || $customUrl->getTargetDocument() === null;
+        return $customUrl->isRedirect() || null === $customUrl->getTargetDocument();
     }
 }

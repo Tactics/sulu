@@ -9,10 +9,11 @@
 
 define([
     'jquery',
+    'config',
     'text!./skeleton.html',
     'text!./on-request.html',
     'text!./error.html'
-], function($, skeletonTemplate, onRequestTemplate, errorTemplate) {
+], function($, config, skeletonTemplate, onRequestTemplate, errorTemplate) {
 
     'use strict';
 
@@ -43,8 +44,8 @@ define([
                 error: errorTemplate,
                 defaultError: '<h2><%= message %></h2>',
                 9900: '<h2><%= translations.objectProviderLabel %></h2>',
-                9901: '<h2><%= translations.changeWebspaceLabel %></h2>',
-                9902: '<h2><%= translations.defaultsProviderLabel %></h2>'
+                9902: '<h2><%= translations.defaultsProviderLabel %></h2>',
+                9907: '<h2><%= translations.changeWebspaceLabel %></h2>'
             }
         };
 
@@ -58,10 +59,13 @@ define([
                 updateContent: {postFix: 'update-content', type: 'on'},
                 error: {postFix: 'error', type: 'on'},
                 webspace: {postFix: 'webspace'},
+                targetGroup: {postFix: 'target-group'},
                 render: {postFix: 'render'}
             },
             namespace: 'sulu.preview.'
         },
+
+        htmlFile: '',
 
         initialize: function() {
             this.previewExpanded = false;
@@ -139,6 +143,33 @@ define([
                 this.events.webspace(this.options.webspace);
             }
 
+            if (config.has('sulu_audience_targeting')) {
+                buttons.audienceTargeting = {
+                    options: {
+                        icon: 'users',
+                        dropdownItems: [
+                            {
+                                id: null,
+                                title: 'No target group'
+                            }
+                        ],
+                        dropdownOptions: {
+                            resultKey: 'target-groups',
+                            titleAttribute: 'title',
+                            idAttribute: 'id',
+                            markSelected: true,
+                            preSelected: true,
+                            changeButton: true,
+                            url: '/admin/api/target-groups',
+                            concatRequestedItemsFirst: true,
+                            callback: function (item) {
+                                this.events.targetGroup(item.id);
+                            }.bind(this)
+                        }
+                    }
+                }
+            }
+
             this.sandbox.start(
                 [
                     {
@@ -184,10 +215,27 @@ define([
          * @param {String} htmlFile The html file including doctype etc.
          */
         setContent: function(htmlFile) {
+            if (this.htmlFile === htmlFile) {
+                return;
+            }
+
+            this.htmlFile = htmlFile;
             var previewDocument = this.getPreviewDocument();
 
+            // clear the preview first (firefox does not override but append)
+            this.write(previewDocument, '');
+            this.write(previewDocument, htmlFile);
+        },
+
+        /**
+         * Reset and write content to document.
+         *
+         * @param {Document} previewDocument
+         * @param {String} content
+         */
+        write: function(previewDocument, content) {
             previewDocument.open();
-            previewDocument.write(htmlFile);
+            previewDocument.write(content);
             previewDocument.close();
 
             this.avoidNavigate(previewDocument);
@@ -233,6 +281,7 @@ define([
          * Refresh the preview document.
          */
         refreshPreview: function() {
+            this.htmlFile = '';
             $(this.getPreviewDocument().documentElement).html('');
 
             this.events.render();
@@ -295,7 +344,7 @@ define([
          * @param {Object} content
          */
         handleSequence: function(propertyName, content) {
-            var sequence = propertyName.split(/([a-zA-Z0-9]+|\[[a-zA-Z0-9]+\])/).filter(Boolean),
+            var sequence = propertyName.split(/([a-zA-Z0-9_]+|\[[a-zA-Z0-9_]+\])/).filter(Boolean),
                 filter = '',
                 item, before = 0,
                 isInt = /^\d*$/, // regex for integer

@@ -85,7 +85,7 @@ abstract class SimpleContentType implements ContentTypeInterface, ContentTypeExp
         $segmentKey
     ) {
         $value = $property->getValue();
-        if ($value != null) {
+        if (null != $value) {
             $node->setProperty($property->getName(), $this->removeIllegalCharacters($this->encodeValue($value)));
         } else {
             $this->remove($node, $property, $webspaceKey, $languageCode, $segmentKey);
@@ -101,14 +101,6 @@ abstract class SimpleContentType implements ContentTypeInterface, ContentTypeExp
         if ($node->hasProperty($property->getName())) {
             $node->getProperty($property->getName())->remove();
         }
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getType()
-    {
-        return ContentTypeInterface::PRE_SAVE;
     }
 
     /**
@@ -155,14 +147,6 @@ abstract class SimpleContentType implements ContentTypeInterface, ContentTypeExp
     public function getContentData(PropertyInterface $property)
     {
         return $property->getValue();
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getReferencedUuids(PropertyInterface $property)
-    {
-        return [];
     }
 
     /**

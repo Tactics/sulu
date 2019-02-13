@@ -41,9 +41,13 @@ use Sulu\Component\Webspace\Manager\WebspaceManagerInterface;
 class DocumentInspector extends BaseDocumentInspector
 {
     private $metadataFactory;
+
     private $structureFactory;
+
     private $namespaceRegistry;
+
     private $encoder;
+
     private $webspaceManager;
 
     public function __construct(
@@ -314,7 +318,7 @@ class DocumentInspector extends BaseDocumentInspector
         $resourceLocatorProperty = $structure->getPropertyByTagName('sulu.rlp');
 
         foreach ($webspace->getAllLocalizations() as $localization) {
-            $resolvedLocale = $localization->getLocalization();
+            $resolvedLocale = $localization->getLocale();
             $locale = $resolvedLocale;
 
             $shadowEnabledName = $this->encoder->localizedSystemName(

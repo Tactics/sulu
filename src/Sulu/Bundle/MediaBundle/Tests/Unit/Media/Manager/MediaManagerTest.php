@@ -16,12 +16,14 @@ use FFMpeg\Exception\ExecutableNotFoundException;
 use FFMpeg\FFProbe;
 use Prophecy\Argument;
 use Prophecy\Prophecy\ObjectProphecy;
+use Sulu\Bundle\AudienceTargetingBundle\Entity\TargetGroupRepositoryInterface;
 use Sulu\Bundle\CategoryBundle\Category\CategoryManagerInterface;
 use Sulu\Bundle\CategoryBundle\Entity\CategoryRepositoryInterface;
 use Sulu\Bundle\MediaBundle\Entity\Collection;
 use Sulu\Bundle\MediaBundle\Entity\CollectionRepositoryInterface;
 use Sulu\Bundle\MediaBundle\Entity\File;
 use Sulu\Bundle\MediaBundle\Entity\FileVersion;
+use Sulu\Bundle\MediaBundle\Entity\FileVersionMeta;
 use Sulu\Bundle\MediaBundle\Entity\Media;
 use Sulu\Bundle\MediaBundle\Entity\MediaRepositoryInterface;
 use Sulu\Bundle\MediaBundle\Entity\MediaType;
@@ -33,11 +35,13 @@ use Sulu\Bundle\MediaBundle\Media\TypeManager\TypeManagerInterface;
 use Sulu\Bundle\SecurityBundle\Entity\User;
 use Sulu\Bundle\TagBundle\Tag\TagManagerInterface;
 use Sulu\Component\PHPCR\PathCleanupInterface;
+use Sulu\Component\Security\Authentication\UserInterface as SuluUserInterface;
 use Sulu\Component\Security\Authentication\UserRepositoryInterface;
 use Sulu\Component\Security\Authorization\SecurityCheckerInterface;
 use Sulu\Component\Security\Authorization\SecurityCondition;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
 class MediaManagerTest extends \PHPUnit_Framework_TestCase
@@ -66,6 +70,11 @@ class MediaManagerTest extends \PHPUnit_Framework_TestCase
      * @var CategoryRepositoryInterface
      */
     private $categoryRepository;
+
+    /**
+     * @var TargetGroupRepositoryInterface
+     */
+    private $targetGroupRepository;
 
     /**
      * @var ObjectProphecy
@@ -130,6 +139,7 @@ class MediaManagerTest extends \PHPUnit_Framework_TestCase
         $this->collectionRepository = $this->prophesize(CollectionRepositoryInterface::class);
         $this->userRepository = $this->prophesize(UserRepositoryInterface::class);
         $this->categoryRepository = $this->prophesize(CategoryRepositoryInterface::class);
+        $this->targetGroupRepository = $this->prophesize(TargetGroupRepositoryInterface::class);
         $this->em = $this->prophesize(EntityManager::class);
         $this->storage = $this->prophesize(StorageInterface::class);
         $this->validator = $this->prophesize(FileValidatorInterface::class);
@@ -160,8 +170,9 @@ class MediaManagerTest extends \PHPUnit_Framework_TestCase
             [
                 'view' => 64,
             ],
-            '/',
-            0
+            '/download/{id}/media/{slug}',
+            0,
+            $this->targetGroupRepository->reveal()
         );
     }
 
@@ -186,6 +197,32 @@ class MediaManagerTest extends \PHPUnit_Framework_TestCase
         $this->mediaRepository->count(Argument::cetera())->shouldBeCalled();
 
         $this->mediaManager->get(1);
+    }
+
+    public function testGetWithoutSuluUser()
+    {
+        $user = $this->prophesize(UserInterface::class);
+        $token = $this->prophesize(TokenInterface::class);
+        $token->getUser()->willReturn($user->reveal());
+
+        $this->tokenStorage->getToken()->willReturn($token);
+        $this->mediaRepository->findMedia([], null, null, null, 64)->willReturn([])->shouldBeCalled();
+        $this->mediaRepository->count(Argument::cetera())->shouldBeCalled();
+
+        $this->mediaManager->get('de', [], null, null);
+    }
+
+    public function testGetWithSuluUser()
+    {
+        $user = $this->prophesize(SuluUserInterface::class);
+        $token = $this->prophesize(TokenInterface::class);
+        $token->getUser()->willReturn($user->reveal());
+
+        $this->tokenStorage->getToken()->willReturn($token->reveal());
+        $this->mediaRepository->findMedia([], null, null, $user->reveal(), 64)->willReturn([])->shouldBeCalled();
+        $this->mediaRepository->count(Argument::cetera())->shouldBeCalled();
+
+        $this->mediaManager->get('de', [], null, null);
     }
 
     public function testDeleteWithSecurity()
@@ -218,6 +255,9 @@ class MediaManagerTest extends \PHPUnit_Framework_TestCase
         $fileVersion->getMimeType()->willReturn('image/png');
         $fileVersion->getStorageOptions()->willReturn(json_encode(['segment' => '01', 'fileName' => 'test.jpg']));
 
+        $fileVersionMeta = $this->prophesize(FileVersionMeta::class);
+        $fileVersion->getMeta()->willReturn([$fileVersionMeta->reveal()]);
+
         $media = $this->prophesize(Media::class);
         $media->getCollection()->willReturn($collection);
         $media->getFiles()->willReturn([$file->reveal()]);
@@ -237,6 +277,10 @@ class MediaManagerTest extends \PHPUnit_Framework_TestCase
         )->shouldBeCalled();
 
         $this->storage->remove(json_encode(['segment' => '01', 'fileName' => 'test.jpg']))->shouldBeCalled();
+
+        $this->em->remove($media->reveal())->shouldBeCalled();
+        $this->em->remove($fileVersionMeta->reveal())->shouldBeCalled();
+        $this->em->flush()->shouldBeCalled();
 
         $this->mediaManager->delete(1, true);
     }
@@ -266,6 +310,14 @@ class MediaManagerTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals($fileName, $media->getName());
     }
 
+    /**
+     * @dataProvider provideSpecialCharacterUrl
+     */
+    public function testSpecialCharacterUrl($id, $filename, $version, $expected)
+    {
+        $this->assertEquals($expected, $this->mediaManager->getUrl($id, $filename, $version));
+    }
+
     public function testSaveWrongVersionType()
     {
         $this->setExpectedException(InvalidMediaTypeException::class);
@@ -292,7 +344,7 @@ class MediaManagerTest extends \PHPUnit_Framework_TestCase
 
         $fileVersion = $this->prophesize(FileVersion::class);
         $fileVersion->getVersion()->willReturn(1);
-        $file->getFileVersions()->willReturn([$fileVersion]);
+        $file->getFileVersion(1)->willReturn($fileVersion->reveal());
 
         $this->typeManager->getMediaType('img')->willReturn(2);
 
@@ -316,6 +368,7 @@ class MediaManagerTest extends \PHPUnit_Framework_TestCase
         $fileVersion->getProperties()->willReturn([]);
         $fileVersion->getFocusPointX()->willReturn(null);
         $fileVersion->getFocusPointY()->willReturn(null);
+        $file->getFileVersion(1)->willReturn($fileVersion->reveal());
         $file->getFileVersions()->willReturn([$fileVersion->reveal()]);
         $file->getVersion()->willReturn(1);
         $media->getFiles()->willReturn([$file->reveal()]);
@@ -351,6 +404,7 @@ class MediaManagerTest extends \PHPUnit_Framework_TestCase
         $fileVersion->getProperties()->willReturn([]);
         $fileVersion->getFocusPointX()->willReturn(1);
         $fileVersion->getFocusPointY()->willReturn(2);
+        $file->getFileVersion(1)->willReturn($fileVersion->reveal());
         $file->getFileVersions()->willReturn([$fileVersion->reveal()]);
         $file->getVersion()->willReturn(1);
         $media->getFiles()->willReturn([$file->reveal()]);
@@ -401,6 +455,15 @@ class MediaManagerTest extends \PHPUnit_Framework_TestCase
         return [
             ['aäüßa', 'aäüßa', 'aaeuesa', ''],
             ['aäüßa.mp4', 'aäüßa', 'aaeuesa', '.mp4'],
+        ];
+    }
+
+    public function provideSpecialCharacterUrl()
+    {
+        return [
+            [1, 'aäüßa.mp4', 2, '/download/1/media/a%C3%A4%C3%BC%C3%9Fa.mp4?v=2'],
+            [1, 'aäüßa', 2, '/download/1/media/a%C3%A4%C3%BC%C3%9Fa?v=2'],
+            [2, 'Sulu & Enterprise.doc', 2, '/download/2/media/Sulu%20%26%20Enterprise.doc?v=2'],
         ];
     }
 

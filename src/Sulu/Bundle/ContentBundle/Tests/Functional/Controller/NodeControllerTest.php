@@ -17,7 +17,6 @@ use PHPCR\NodeInterface;
 use PHPCR\PropertyType;
 use PHPCR\SessionInterface;
 use Sulu\Bundle\ContentBundle\Document\PageDocument;
-use Sulu\Bundle\TagBundle\Entity\Tag;
 use Sulu\Bundle\TestBundle\Testing\SuluTestCase;
 use Sulu\Component\Content\Document\RedirectType;
 use Sulu\Component\Content\Document\WorkflowStage;
@@ -50,6 +49,8 @@ class NodeControllerTest extends SuluTestCase
 
     public function setUp()
     {
+        parent::setUp();
+
         $this->em = $this->getEntityManager();
         $this->session = $this->getContainer()->get('sulu_document_manager.default_session');
         $this->liveSession = $this->getContainer()->get('sulu_document_manager.live_session');
@@ -63,7 +64,9 @@ class NodeControllerTest extends SuluTestCase
     {
         $this->purgeDatabase();
 
-        $tag1 = new Tag();
+        $tagRepository = $this->getContainer()->get('sulu.repository.tag');
+
+        $tag1 = $tagRepository->createNew();
 
         $metadata = $this->em->getClassMetaData(get_class($tag1));
         $metadata->setIdGenerator(new \Doctrine\ORM\Id\AssignedGenerator());
@@ -74,19 +77,19 @@ class NodeControllerTest extends SuluTestCase
         $this->em->persist($tag1);
         $this->em->flush();
 
-        $tag2 = new Tag();
+        $tag2 = $tagRepository->createNew();
         $tag2->setId(2);
         $tag2->setName('tag2');
         $this->em->persist($tag2);
         $this->em->flush();
 
-        $tag3 = new Tag();
+        $tag3 = $tagRepository->createNew();
         $tag3->setId(3);
         $tag3->setName('tag3');
         $this->em->persist($tag3);
         $this->em->flush();
 
-        $tag4 = new Tag();
+        $tag4 = $tagRepository->createNew();
         $tag4->setId(4);
         $tag4->setName('tag4');
         $this->em->persist($tag4);
@@ -136,7 +139,7 @@ class NodeControllerTest extends SuluTestCase
         $this->assertEquals(['tag1', 'tag2'], $response->tags);
         $this->assertEquals($this->getTestUserId(), $response->creator);
         $this->assertEquals($this->getTestUserId(), $response->changer);
-        $this->assertNotFalse(\DateTime::createFromFormat('Y-m-d', $response->authored));
+        $this->assertNotFalse(\DateTime::createFromFormat(\DateTime::ISO8601, $response->authored));
 
         /** @var NodeInterface $content */
         $defaultContent = $this->session->getNode('/cmf/sulu_io/contents/news/test-1');
@@ -264,7 +267,7 @@ class NodeControllerTest extends SuluTestCase
         $this->assertEquals(['tag1', 'tag2'], $response['tags']);
         $this->assertEquals('/test_en', $response['url']);
         $this->assertEquals('Test English', $response['article']);
-        $this->assertNotFalse(\DateTime::createFromFormat('Y-m-d', $response['authored']));
+        $this->assertNotFalse(\DateTime::createFromFormat(\DateTime::ISO8601, $response['authored']));
 
         $client->request('GET', '/api/nodes/' . $document->getUuid() . '?language=de');
         $response = json_decode($client->getResponse()->getContent(), true);
@@ -274,6 +277,55 @@ class NodeControllerTest extends SuluTestCase
         $this->assertEquals(['tag1', 'tag2'], $response['tags']);
         $this->assertEquals('/test_de', $response['url']);
         $this->assertEquals('Test German', $response['article']);
+    }
+
+    public function testGetAnotherTemplate()
+    {
+        $document = $this->createPageDocument();
+        $document->setTitle('test_en');
+        $document->setResourceSegment('/test_en');
+        $document->setStructureType('default');
+        $document->getStructure()->bind([
+            'tags' => [
+                'tag1',
+                'tag2',
+            ],
+            'article' => 'Test English',
+        ]);
+        $this->documentManager->persist($document, 'en', ['parent_path' => '/cmf/sulu_io/contents']);
+        $this->documentManager->flush();
+
+        $document->setTitle('test_de');
+        $document->setResourceSegment('/test_de');
+        $document->setStructureType('default');
+        $document->getStructure()->bind([
+            'tags' => [
+                'tag1',
+                'tag2',
+            ],
+            'article' => 'Test German',
+        ]);
+        $this->documentManager->persist($document, 'de', ['parent_path' => '/cmf/sulu_io/contents']);
+        $this->documentManager->flush();
+
+        // change the template now to "simple"
+        // the old data "article" should still exists
+        $document->setStructureType('simple');
+        $this->documentManager->persist($document, 'en', ['parent_path' => '/cmf/sulu_io/contents']);
+        $this->documentManager->persist($document, 'de', ['parent_path' => '/cmf/sulu_io/contents']);
+        $this->documentManager->flush();
+
+        $client = $this->createAuthenticatedClient();
+
+        $client->request('GET', '/api/nodes/' . $document->getUuid() . '?language=en');
+        $response = json_decode($client->getResponse()->getContent(), true);
+
+        $this->assertArrayNotHasKey('article', $response);
+
+        $client->request('GET', '/api/nodes/' . $document->getUuid() . '?language=en&template=default');
+        $response = json_decode($client->getResponse()->getContent(), true);
+
+        $this->assertEquals('Test English', $response['article']);
     }
 
     public function testGetNotExisting()
@@ -510,7 +562,7 @@ class NodeControllerTest extends SuluTestCase
                 'title' => 'Testtitle DE',
                 'template' => 'default',
                 'url' => '/test-de',
-                'authored' => '2016-12-21',
+                'authored' => '2017-11-20T13:15:00+0000',
                 'author' => 1,
             ]
         );
@@ -522,7 +574,7 @@ class NodeControllerTest extends SuluTestCase
                 'title' => 'Testtitle EN',
                 'template' => 'default',
                 'url' => '/test-en',
-                'authored' => '2016-12-21',
+                'authored' => '2017-11-20T13:15:00+0000',
                 'author' => 1,
             ]
         );
@@ -537,8 +589,8 @@ class NodeControllerTest extends SuluTestCase
         $this->assertEquals($this->getTestUserId(), $response['changer']);
         $this->assertEquals($this->getTestUserId(), $response['creator']);
 
-        $this->assertNotFalse(\DateTime::createFromFormat('Y-m-d', $response['authored']));
-        $this->assertEquals('2016-12-21', (new \DateTime($response['authored']))->format('Y-m-d'));
+        $this->assertNotFalse(\DateTime::createFromFormat(\DateTime::ISO8601, $response['authored']));
+        $this->assertEquals('2017-11-20T13:15:00+0000', $response['authored']);
         $this->assertEquals(1, $response['author']);
 
         $client->request('GET', '/api/nodes/' . $response['id'] . '?language=en');
@@ -550,7 +602,7 @@ class NodeControllerTest extends SuluTestCase
         $this->assertEquals($this->getTestUserId(), $response['changer']);
         $this->assertEquals($this->getTestUserId(), $response['creator']);
 
-        $this->assertEquals('2016-12-21', (new \DateTime($response['authored']))->format('Y-m-d'));
+        $this->assertEquals('2017-11-20T13:15:00+0000', $response['authored']);
         $this->assertEquals(1, $response['author']);
 
         $this->assertFalse(
@@ -601,7 +653,7 @@ class NodeControllerTest extends SuluTestCase
         $this->assertEquals(2, count((array) $response->ext));
 
         $this->assertEquals(7, count((array) $response->ext->seo));
-        $this->assertEquals(7, count((array) $response->ext->excerpt));
+        $this->assertEquals(8, count((array) $response->ext->excerpt));
 
         $client->request('GET', '/api/nodes/' . $data[0]['id'] . '?language=en');
 
@@ -1654,7 +1706,7 @@ class NodeControllerTest extends SuluTestCase
 
         $client->request(
             'POST',
-            '/api/nodes/' . $document->getUuid() . '?action=remove-draft&language=de'
+            '/api/nodes/' . $document->getUuid() . '?action=remove-draft&webspace=sulu_io&language=de'
         );
 
         $this->assertHttpStatusCode(200, $client->getResponse());
@@ -1668,6 +1720,35 @@ class NodeControllerTest extends SuluTestCase
         $this->assertEquals('published title', $defaultNode->getPropertyValue('i18n:de-title'));
         $liveNode = $this->liveSession->getNodeByIdentifier($document->getUuid());
         $this->assertEquals('published title', $liveNode->getPropertyValue('i18n:de-title'));
+    }
+
+    public function testRemoveDraftWithoutWebspace()
+    {
+        $document = $this->createPageDocument();
+        $document->setTitle('published title');
+        $document->setStructureType('default');
+        $this->documentManager->persist($document, 'de', ['parent_path' => '/cmf/sulu_io/contents']);
+        $this->documentManager->publish($document, 'de');
+        $this->documentManager->flush();
+
+        $document = $this->documentManager->find($document->getUuid(), 'de');
+        $document->setTitle('draft title');
+        $this->documentManager->persist($document, 'de');
+        $this->documentManager->flush();
+
+        $defaultNode = $this->session->getNodeByIdentifier($document->getUuid());
+        $this->assertEquals('draft title', $defaultNode->getPropertyValue('i18n:de-title'));
+        $liveNode = $this->liveSession->getNodeByIdentifier($document->getUuid());
+        $this->assertEquals('published title', $liveNode->getPropertyValue('i18n:de-title'));
+
+        $client = $this->createAuthenticatedClient();
+
+        $client->request(
+            'POST',
+            '/api/nodes/' . $document->getUuid() . '?action=remove-draft&language=de'
+        );
+
+        $this->assertHttpStatusCode(400, $client->getResponse());
     }
 
     public function testOrder()
@@ -1972,7 +2053,7 @@ class NodeControllerTest extends SuluTestCase
         $response = json_decode($client->getResponse()->getContent(), true);
 
         $nodes = $response['_embedded']['nodes'];
-        $this->assertCount(2, $nodes);
+        $this->assertCount(3, $nodes);
 
         $titles = array_map(
             function ($node) {
@@ -1982,6 +2063,7 @@ class NodeControllerTest extends SuluTestCase
         );
         $this->assertContains('Sulu CMF', $titles);
         $this->assertContains('Test CMF', $titles);
+        $this->assertContains('Destination CMF', $titles);
     }
 
     public function testCGetWithAllWebspaceNodesDifferentLocales()
@@ -2062,6 +2144,52 @@ class NodeControllerTest extends SuluTestCase
 
         $this->assertEquals('/dornbirn', $result['path']);
         $this->assertEquals('Dornbirn', $result['title']);
+    }
+
+    public function testRenamePageWithLinkedChild()
+    {
+        $client = $this->createAuthenticatedClient();
+        $this->importer->import(__DIR__ . '/../../app/Resources/exports/tree.xml');
+
+        $document = $this->documentManager->find('585ccd35-a98e-4e41-a62c-e502ca905496', 'en');
+        $document->setStructureType('internallinks');
+        $document->getStructure()->bind(
+            [
+                'internalLinks' => [
+                    '5778b19f-460a-47fc-93da-9a6126e5c384',
+                ],
+            ]
+        );
+        $this->documentManager->persist($document, 'en');
+        $this->documentManager->publish($document, 'en');
+        $this->documentManager->flush();
+        $this->documentManager->clear();
+
+        $client->request('GET', '/api/nodes/' . $document->getUuid() . '?webspace=sulu_io&language=en');
+        $data = json_decode($client->getResponse()->getContent(), true);
+        $data['title'] = 'Sulu is awesome';
+
+        $client->request(
+            'PUT',
+            '/api/nodes/' . $document->getUuid() . '?webspace=sulu_io&language=en&action=publish',
+            $data
+        );
+
+        $this->assertHttpStatusCode(200, $client->getResponse());
+        $data = json_decode($client->getResponse()->getContent(), true);
+
+        $this->assertEquals('/sulu-is-awesome', $data['path']);
+
+        /** @var SessionInterface $liveSession */
+        $liveSession = $this->getContainer()->get('sulu_document_manager.live_session');
+        /** @var SessionInterface $session */
+        $session = $this->getContainer()->get('sulu_document_manager.default_session');
+
+        $node = $liveSession->getNode('/cmf/sulu_io/contents/sulu-is-awesome');
+        $this->assertEquals($data['id'], $node->getIdentifier());
+
+        $node = $session->getNode('/cmf/sulu_io/contents/sulu-is-awesome');
+        $this->assertEquals($data['id'], $node->getIdentifier());
     }
 
     private function setUpContent($data)

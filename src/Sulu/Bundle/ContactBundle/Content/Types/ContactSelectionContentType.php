@@ -19,17 +19,22 @@ use Sulu\Bundle\ContactBundle\Api\Contact;
 use Sulu\Bundle\ContactBundle\Contact\ContactManagerInterface;
 use Sulu\Bundle\ContactBundle\Util\IdConverterInterface;
 use Sulu\Bundle\ContactBundle\Util\IndexComparatorInterface;
+use Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStoreInterface;
 use Sulu\Component\Content\Compat\PropertyInterface;
 use Sulu\Component\Content\Compat\PropertyParameter;
 use Sulu\Component\Content\ComplexContentType;
 use Sulu\Component\Content\ContentTypeExportInterface;
-use Sulu\Component\Content\ContentTypeInterface;
+use Sulu\Component\Content\PreResolvableContentTypeInterface;
 
 /**
  * ContentType for Contact.
  */
-class ContactSelectionContentType extends ComplexContentType implements ContentTypeExportInterface
+class ContactSelectionContentType extends ComplexContentType implements ContentTypeExportInterface, PreResolvableContentTypeInterface
 {
+    const PREFIX_CONTACT = 'c';
+
+    const PREFIX_ACCOUNT = 'a';
+
     /**
      * @var string
      */
@@ -60,13 +65,25 @@ class ContactSelectionContentType extends ComplexContentType implements ContentT
      */
     private $comparator;
 
+    /**
+     * @var ReferenceStoreInterface
+     */
+    private $accountReferenceStore;
+
+    /**
+     * @var ReferenceStoreInterface
+     */
+    private $contactReferenceStore;
+
     public function __construct(
         $template,
         ContactManagerInterface $contactManager,
         ContactManagerInterface $accountManager,
         SerializerInterface $serializer,
         IdConverterInterface $converter,
-        IndexComparatorInterface $comparator
+        IndexComparatorInterface $comparator,
+        ReferenceStoreInterface $accountReferenceStore,
+        ReferenceStoreInterface $contactReferenceStore
     ) {
         $this->template = $template;
         $this->contactManager = $contactManager;
@@ -74,14 +91,8 @@ class ContactSelectionContentType extends ComplexContentType implements ContentT
         $this->serializer = $serializer;
         $this->converter = $converter;
         $this->comparator = $comparator;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getType()
-    {
-        return ContentTypeInterface::PRE_SAVE;
+        $this->accountReferenceStore = $accountReferenceStore;
+        $this->contactReferenceStore = $contactReferenceStore;
     }
 
     /**
@@ -115,7 +126,7 @@ class ContactSelectionContentType extends ComplexContentType implements ContentT
         $segmentKey
     ) {
         $value = $property->getValue();
-        $node->setProperty($property->getName(), ($value === null ? [] : $value));
+        $node->setProperty($property->getName(), (null === $value ? [] : $value));
     }
 
     /**
@@ -141,21 +152,24 @@ class ContactSelectionContentType extends ComplexContentType implements ContentT
         $value = $property->getValue();
         $locale = $property->getStructure()->getLanguageCode();
 
-        if ($value === null || !is_array($value) || count($value) === 0) {
+        if (null === $value || !is_array($value) || 0 === count($value)) {
             return [];
         }
 
-        $ids = $this->converter->convertIdsToGroupedIds($value, ['a' => [], 'c' => []]);
+        $ids = $this->converter->convertIdsToGroupedIds(
+            $value,
+            [self::PREFIX_ACCOUNT => [], self::PREFIX_CONTACT => []]
+        );
 
-        $accounts = $this->accountManager->getByIds($ids['a'], $locale);
-        $contacts = $this->contactManager->getByIds($ids['c'], $locale);
+        $accounts = $this->accountManager->getByIds($ids[self::PREFIX_ACCOUNT], $locale);
+        $contacts = $this->contactManager->getByIds($ids[self::PREFIX_CONTACT], $locale);
 
         $result = array_merge($accounts, $contacts);
         @usort(
             $result,
             function ($a, $b) use ($value) {
-                $typeA = $a instanceof Contact ? 'c' : 'a';
-                $typeB = $b instanceof Contact ? 'c' : 'a';
+                $typeA = $a instanceof Contact ? self::PREFIX_CONTACT : self::PREFIX_ACCOUNT;
+                $typeB = $b instanceof Contact ? self::PREFIX_CONTACT : self::PREFIX_ACCOUNT;
 
                 return $this->comparator->compare($typeA . $a->getId(), $typeB . $b->getId(), $value);
             }
@@ -167,6 +181,8 @@ class ContactSelectionContentType extends ComplexContentType implements ContentT
                 if ($entity instanceof Account) {
                     $groups = ['fullAccount', 'partialContact'];
                 }
+
+                $groups[] = 'partialCategory';
 
                 return $this->serializer->serialize(
                     $entity,
@@ -231,5 +247,29 @@ class ContactSelectionContentType extends ComplexContentType implements ContentT
     ) {
         $property->setValue(json_decode($value));
         $this->write($node, $property, $userId, $webspaceKey, $languageCode, $segmentKey);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function preResolve(PropertyInterface $property)
+    {
+        $value = $property->getValue();
+        if (null === $value || !is_array($value) || 0 === count($value)) {
+            return [];
+        }
+
+        $ids = $this->converter->convertIdsToGroupedIds(
+            $value,
+            [self::PREFIX_ACCOUNT => [], self::PREFIX_CONTACT => []]
+        );
+
+        foreach ($ids[self::PREFIX_ACCOUNT] as $account) {
+            $this->accountReferenceStore->add($account);
+        }
+
+        foreach ($ids[self::PREFIX_CONTACT] as $contact) {
+            $this->contactReferenceStore->add($contact);
+        }
     }
 }

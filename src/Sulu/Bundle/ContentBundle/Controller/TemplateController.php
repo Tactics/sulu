@@ -14,6 +14,7 @@ namespace Sulu\Bundle\ContentBundle\Controller;
 use Sulu\Component\Content\Compat\Structure;
 use Sulu\Component\Content\Compat\StructureInterface;
 use Sulu\Component\Content\Compat\StructureManagerInterface;
+use Sulu\Component\Localization\Localization;
 use Sulu\Component\Security\Authentication\UserInterface;
 use Sulu\Component\Webspace\Manager\WebspaceManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
@@ -52,7 +53,7 @@ class TemplateController extends Controller
 
         $type = $request->get('type', Structure::TYPE_PAGE);
 
-        if ($type === Structure::TYPE_PAGE) {
+        if (Structure::TYPE_PAGE === $type) {
             $structureProvider = $this->get('sulu.content.webspace_structure_provider');
             $structures = $structureProvider->getStructures($request->get('webspace'));
         } else {
@@ -62,7 +63,7 @@ class TemplateController extends Controller
 
         $templates = [];
         foreach ($structures as $structure) {
-            if (false === $structure->getInternal() || $internal !== false) {
+            if (false === $structure->getInternal() || false !== $internal) {
                 $templates[] = [
                     'internal' => $structure->getInternal(),
                     'template' => $structure->getKey(),
@@ -94,14 +95,11 @@ class TemplateController extends Controller
     public function contentAction(Request $request, $key = null)
     {
         $fireEvent = false;
-        $templateIndex = null;
         $webspace = $request->get('webspace');
-        $language = $request->get('language');
-        $uuid = $request->get('uuid');
         $type = $request->get('type', 'page');
 
-        if ($key === null) {
-            if ($type === 'page') {
+        if (null === $key) {
+            if ('page' === $type) {
                 $webspaceManager = $this->container->get('sulu_core.webspace.webspace_manager');
                 $key = $webspaceManager->findWebspaceByKey($webspace)->getDefaultTemplate($type);
                 $fireEvent = true;
@@ -123,11 +121,13 @@ class TemplateController extends Controller
             [
                 'template' => $template,
                 'webspaceKey' => $webspace,
-                'languageCode' => $language,
-                'uuid' => $uuid,
+                'languageCode' => $request->get('language'),
+                'uuid' => $request->get('uuid'),
                 'userLocale' => $userLocale,
                 'templateKey' => $key,
                 'fireEvent' => $fireEvent,
+                'excludedProperties' => $request->query->has('excludedProperties')
+                    ? explode(',', $request->query->get('excludedProperties')) : [],
             ]
         );
     }
@@ -189,8 +189,8 @@ class TemplateController extends Controller
         $i = 0;
         foreach ($webspace->getAllLocalizations() as $localization) {
             $localizations[] = [
-                'localization' => $localization->getLocalization(),
-                'name' => $localization->getLocalization('-'),
+                'localization' => $localization->getLocale(),
+                'name' => $localization->getLocale(Localization::DASH),
                 'id' => $i++,
             ];
         }
@@ -228,7 +228,7 @@ class TemplateController extends Controller
 
         $languages = [];
         foreach ($webspace->getAllLocalizations() as $localization) {
-            $languages[] = $localization->getLocalization();
+            $languages[] = $localization->getLocale();
         }
 
         return $this->render(

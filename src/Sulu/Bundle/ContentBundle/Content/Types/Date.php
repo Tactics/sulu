@@ -42,7 +42,7 @@ class Date extends SimpleContentType
         $segmentKey
     ) {
         $value = $property->getValue();
-        if ($value != null) {
+        if (null != $value) {
             $value = \DateTime::createFromFormat('Y-m-d', $value);
 
             $node->setProperty($property->getName(), $value);
@@ -60,7 +60,10 @@ class Date extends SimpleContentType
         if ($node->hasProperty($property->getName())) {
             /** @var \DateTime $propertyValue */
             $propertyValue = $node->getPropertyValue($property->getName());
-            $value = $propertyValue->format('Y-m-d');
+
+            if ($propertyValue instanceof \DateTime) {
+                $value = $propertyValue->format('Y-m-d');
+            }
         }
 
         $property->setValue($value);

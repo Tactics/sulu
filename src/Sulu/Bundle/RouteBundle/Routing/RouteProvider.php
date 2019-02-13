@@ -95,13 +95,21 @@ class RouteProvider implements RouteProviderInterface
      */
     public function getRouteCollectionForRequest(Request $request)
     {
+        $path = $this->decodePathInfo($request->getPathInfo());
+
         $collection = new RouteCollection();
-        $path = $request->getPathInfo();
         $prefix = $this->requestAnalyzer->getResourceLocatorPrefix();
 
-        if (!empty($prefix) && strpos($path, $prefix) === 0) {
+        if (!empty($prefix) && 0 === strpos($path, $prefix)) {
             $path = PathHelper::relativizePath($path, $prefix);
         }
+
+        // when the URI ends with a dot - symfony returns empty request-format
+        if ('' === $format = $request->getRequestFormat()) {
+            return $collection;
+        }
+
+        $path = $this->stripFormatExtension($path, $format);
 
         $route = $this->findRouteByPath($path, $request->getLocale());
         if ($route && array_key_exists($route->getId(), $this->symfonyRouteCache)) {
@@ -124,10 +132,7 @@ class RouteProvider implements RouteProviderInterface
             return $collection;
         }
 
-        $collection->add(
-            self::ROUTE_PREFIX . $route->getId(),
-            $this->createRoute($route, $request)
-        );
+        $collection->add(self::ROUTE_PREFIX . $route->getId(), $this->createRoute($route, $request));
 
         return $collection;
     }
@@ -155,7 +160,7 @@ class RouteProvider implements RouteProviderInterface
      */
     public function getRouteByName($name)
     {
-        if (strpos($name, self::ROUTE_PREFIX) !== 0) {
+        if (0 !== strpos($name, self::ROUTE_PREFIX)) {
             throw new RouteNotFoundException();
         }
 
@@ -199,7 +204,7 @@ class RouteProvider implements RouteProviderInterface
      */
     protected function createRoute(RouteInterface $route, Request $request)
     {
-        $routePath = $this->requestAnalyzer->getResourceLocatorPrefix() . $route->getPath();
+        $routePath = $this->decodePathInfo($request->getPathInfo());
 
         if ($route->isHistory()) {
             return new Route(
@@ -236,5 +241,40 @@ class RouteProvider implements RouteProviderInterface
         );
 
         return $this->symfonyRouteCache[$route->getId()] = $symfonyRoute;
+    }
+
+    /**
+     * Server encodes the url and symfony does not encode it
+     * Symfony decodes this data here https://github.com/symfony/symfony/blob/3.3/src/Symfony/Component/Routing/Matcher/UrlMatcher.php#L91.
+     *
+     * @param $pathInfo
+     *
+     * @return string
+     */
+    private function decodePathInfo($pathInfo)
+    {
+        if (null === $pathInfo || '' === $pathInfo) {
+            return '';
+        }
+
+        return '/' . ltrim(rawurldecode($pathInfo), '/');
+    }
+
+    /**
+     * Return the given path without the format extension.
+     *
+     * @param string $path
+     * @param string $format
+     *
+     * @return string
+     */
+    private function stripFormatExtension($path, $format)
+    {
+        $extension = '.' . $format;
+        if (substr($path, -strlen($extension)) === $extension) {
+            $path = substr($path, 0, strlen($path) - strlen($extension));
+        }
+
+        return $path;
     }
 }

@@ -90,6 +90,8 @@ class AccountRepository extends NestedTreeRepository implements DataProviderRepo
                 ->leftJoin('account.notes', 'notes')
                 ->leftJoin('account.faxes', 'faxes')
                 ->leftJoin('faxes.faxType', 'faxType')
+                ->leftJoin('account.socialMediaProfiles', 'socialMediaProfiles')
+                ->leftJoin('socialMediaProfiles.socialMediaProfileType', 'socialMediaProfileType')
                 ->leftJoin('account.bankAccounts', 'bankAccounts')
                 ->leftJoin('account.tags', 'tags')
                 ->leftJoin('account.mainContact', 'mainContact')
@@ -116,7 +118,7 @@ class AccountRepository extends NestedTreeRepository implements DataProviderRepo
                 ->addSelect('medias')
                 ->where('account.id = :accountId');
 
-            if ($contacts === true) {
+            if (true === $contacts) {
                 $qb->leftJoin('account.accountContacts', 'accountContacts')
                     ->leftJoin('accountContacts.contact', 'contacts')
                     ->leftJoin('accountContacts.position', 'position')
@@ -143,7 +145,7 @@ class AccountRepository extends NestedTreeRepository implements DataProviderRepo
      */
     public function findByIds($ids)
     {
-        if (count($ids) === 0) {
+        if (0 === count($ids)) {
             return [];
         }
 

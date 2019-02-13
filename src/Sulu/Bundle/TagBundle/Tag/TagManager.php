@@ -13,7 +13,6 @@ namespace Sulu\Bundle\TagBundle\Tag;
 
 use Doctrine\Common\Persistence\ObjectManager;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
-use Sulu\Bundle\TagBundle\Entity\Tag;
 use Sulu\Bundle\TagBundle\Entity\TagRepository;
 use Sulu\Bundle\TagBundle\Event\TagDeleteEvent;
 use Sulu\Bundle\TagBundle\Event\TagEvents;
@@ -31,7 +30,9 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 class TagManager implements TagManagerInterface
 {
     protected static $tagEntityName = 'SuluTagBundle:Tag';
+
     protected static $userEntityName = 'Sulu\Component\Security\Authentication\UserInterface';
+
     protected static $contactEntityName = 'Sulu\Component\Contact\Model\ContactInterface';
 
     /**
@@ -96,7 +97,7 @@ class TagManager implements TagManagerInterface
     /**
      * Loads all the tags managed in this system.
      *
-     * @return Tag[]
+     * @return TagInterface[]
      */
     public function findAll()
     {
@@ -108,7 +109,7 @@ class TagManager implements TagManagerInterface
      *
      * @param $id number The id of the tag
      *
-     * @return Tag
+     * @return TagInterface
      */
     public function findById($id)
     {
@@ -120,7 +121,7 @@ class TagManager implements TagManagerInterface
      *
      * @param $name
      *
-     * @return Tag
+     * @return TagInterface
      */
     public function findByName($name)
     {
@@ -156,7 +157,7 @@ class TagManager implements TagManagerInterface
                     throw new TagNotFoundException($id);
                 }
             } else {
-                $tag = new Tag();
+                $tag = $this->tagRepository->createNew();
             }
 
             $user = $this->userRepository->findUserById($userId);
@@ -209,7 +210,7 @@ class TagManager implements TagManagerInterface
      *
      * @throws Exception\TagNotFoundException
      *
-     * @return Tag The new Tag, which is valid for all given tags
+     * @return TagInterface The new Tag, which is valid for all given tags
      */
     public function merge($srcTagIds, $destTagId)
     {
@@ -254,7 +255,7 @@ class TagManager implements TagManagerInterface
 
         foreach ($tagIds as $tagId) {
             $tag = $this->findById($tagId);
-            if ($tag !== null) {
+            if (null !== $tag) {
                 $resolvedTags[] = $tag->getName();
             }
         }
@@ -275,7 +276,7 @@ class TagManager implements TagManagerInterface
 
         foreach ($tagNames as $tagName) {
             $tag = $this->findByName($tagName);
-            if ($tag !== null) {
+            if (null !== $tag) {
                 $resolvedTags[] = $tag->getId();
             }
         }

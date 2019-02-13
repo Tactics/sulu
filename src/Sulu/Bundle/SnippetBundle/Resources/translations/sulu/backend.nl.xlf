@@ -34,13 +34,25 @@
                 <source>snippet.delete-confirm-text</source>
                 <target>Weet je zeker dat je het fragment wilt verwijderen?</target>
             </trans-unit>
+            <trans-unit id="10a" resname="snippet.save-confirm-text">
+                <source>snippet.save-confirm-text</source>
+                <target>Dit fragment staat ingesteld als standaard voor een webspace. Door het fragmenttype te wijzigen verliest het deze eigenschap.</target>
+            </trans-unit>
             <trans-unit id="11" resname="snippet.delete-confirm-title">
                 <source>snippet.delete-confirm-title</source>
                 <target>Bevestig verwijderen</target>
             </trans-unit>
+            <trans-unit id="11a" resname="snippet.save-confirm-title">
+                <source>snippet.save-confirm-title</source>
+                <target>Bevestig type wijziging</target>
+            </trans-unit>
             <trans-unit id="12" resname="snippet.delete-do-it">
                 <source>snippet.delete-do-it</source>
                 <target>Ja, ik weet het zeker</target>
+            </trans-unit>
+            <trans-unit id="12a" resname="snippet.save-do-it">
+                <source>snippet.save-do-it</source>
+                <target>Toch wijzigen</target>
             </trans-unit>
             <trans-unit id="13" resname="snippet.delete-no-snippets-selected">
                 <source>snippet.delete-no-snippets-selected</source>
@@ -101,6 +113,10 @@
             <trans-unit id="26" resname="snippet.settings.copy-locale-overlay.info">
                 <source>snippet.settings.copy-locale-overlay.info</source>
                 <target>Een nieuw fragment zal worden aangemaakt</target>
+            </trans-unit>
+            <trans-unit id="27" resname="content-navigation.snippets.taxonomies">
+                <source>content-navigation.snippets.excerpt</source>
+                <target>Taxonomieën</target>
             </trans-unit>
         </body>
     </file>

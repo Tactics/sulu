@@ -107,13 +107,13 @@ class Version201511240844 implements VersionInterface, ContainerAwareInterface
             $rows = $this->session->getWorkspace()->getQueryManager()->createQuery(
                 sprintf(
                     'SELECT * FROM [nt:unstructured] WHERE [%s] = "%s"',
-                    $this->propertyEncoder->localizedSystemName('nodeType', $localization->getLocalization()),
+                    $this->propertyEncoder->localizedSystemName('nodeType', $localization->getLocale()),
                     RedirectType::EXTERNAL
                 ),
                 'JCR-SQL2'
             )->execute();
 
-            $name = $this->propertyEncoder->localizedSystemName('external', $localization->getLocalization());
+            $name = $this->propertyEncoder->localizedSystemName('external', $localization->getLocale());
             foreach ($rows->getNodes() as $node) {
                 /** @var NodeInterface $node */
                 $value = $node->getPropertyValue($name);
@@ -175,7 +175,7 @@ class Version201511240844 implements VersionInterface, ContainerAwareInterface
     {
         $structureName = $structureMetadata->getName();
         foreach ($structureMetadata->getProperties() as $property) {
-            if ($property->getType() === 'url') {
+            if ('url' === $property->getType()) {
                 $properties[$structureName][] = ['property' => $property];
             } elseif ($property instanceof BlockMetadata) {
                 $this->findUrlBlockProperties($property, $structureName, $properties);
@@ -196,7 +196,7 @@ class Version201511240844 implements VersionInterface, ContainerAwareInterface
         foreach ($property->getComponents() as $component) {
             $componentResult = ['component' => $component, 'children' => []];
             foreach ($component->getChildren() as $childProperty) {
-                if ($childProperty->getType() === 'url') {
+                if ('url' === $childProperty->getType()) {
                     $componentResult['children'][$childProperty->getName()] = $childProperty;
                 }
             }
@@ -224,7 +224,7 @@ class Version201511240844 implements VersionInterface, ContainerAwareInterface
             $rows = $this->session->getWorkspace()->getQueryManager()->createQuery(
                 sprintf(
                     'SELECT * FROM [nt:unstructured] WHERE [%s] = "%s" OR [%s] = "%s"',
-                    $this->propertyEncoder->localizedSystemName('template', $localization->getLocalization()),
+                    $this->propertyEncoder->localizedSystemName('template', $localization->getLocale()),
                     $structureMetadata->getName(),
                     'template',
                     $structureMetadata->getName()
@@ -233,7 +233,7 @@ class Version201511240844 implements VersionInterface, ContainerAwareInterface
             )->execute();
 
             foreach ($rows->getNodes() as $node) {
-                $this->upgradeNode($node, $localization->getLocalization(), $properties, $addScheme);
+                $this->upgradeNode($node, $localization->getLocale(), $properties, $addScheme);
             }
         }
     }
@@ -340,12 +340,12 @@ class Version201511240844 implements VersionInterface, ContainerAwareInterface
     private function upgradeUrl(&$value)
     {
         if (!empty($value)
-            && strpos($value, 'http://') === false
-            && strpos($value, 'https://') === false
-            && strpos($value, 'ftp://') === false
-            && strpos($value, 'ftps://') === false
-            && strpos($value, 'mailto:') === false
-            && strpos($value, '//') === false
+            && false === strpos($value, 'http://')
+            && false === strpos($value, 'https://')
+            && false === strpos($value, 'ftp://')
+            && false === strpos($value, 'ftps://')
+            && false === strpos($value, 'mailto:')
+            && false === strpos($value, '//')
         ) {
             $value = 'http://' . $value;
         }
@@ -362,7 +362,7 @@ class Version201511240844 implements VersionInterface, ContainerAwareInterface
      */
     private function downgradeUrl(&$value)
     {
-        if (strpos($value, 'http://') === 0) {
+        if (0 === strpos($value, 'http://')) {
             $value = substr($value, 7);
         }
 

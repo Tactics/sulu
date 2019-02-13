@@ -131,10 +131,11 @@ class PreviewMessageHandler implements MessageHandlerInterface
             $message['locale'],
             $message['data'] ?: []
         );
-        $response = $this->preview->render($token, $message['webspaceKey'], $message['locale']);
 
         $context->set('previewToken', $token);
         $context->set('locale', $message['locale']);
+
+        $response = $this->preview->render($token, $message['webspaceKey'], $message['locale']);
 
         return ['command' => 'start', 'token' => $token, 'response' => $response, 'msg' => 'OK'];
     }
@@ -167,7 +168,8 @@ class PreviewMessageHandler implements MessageHandlerInterface
             $context->get('previewToken'),
             $message['webspaceKey'],
             $context->get('locale'),
-            $message['data']
+            $message['data'],
+            array_key_exists('targetGroupId', $message) ? $message['targetGroupId'] : null
         );
 
         return ['command' => 'update', 'data' => $changes, 'msg' => 'OK'];
@@ -188,7 +190,8 @@ class PreviewMessageHandler implements MessageHandlerInterface
             $message['webspaceKey'],
             $context->get('locale'),
             $message['context'],
-            $message['data']
+            $message['data'],
+            array_key_exists('targetGroupId', $message) ? $message['targetGroupId'] : null
         );
 
         return ['command' => 'update-context', 'response' => $response, 'msg' => 'OK'];
@@ -199,7 +202,8 @@ class PreviewMessageHandler implements MessageHandlerInterface
         $response = $this->preview->render(
             $context->get('previewToken'),
             $message['webspaceKey'],
-            $context->get('locale')
+            $context->get('locale'),
+            array_key_exists('targetGroupId', $message) ? $message['targetGroupId'] : null
         );
 
         return ['command' => 'render', 'response' => $response, 'msg' => 'OK'];

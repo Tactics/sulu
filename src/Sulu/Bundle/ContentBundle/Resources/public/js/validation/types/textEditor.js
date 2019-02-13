@@ -74,7 +74,15 @@ define([
                 },
 
                 needsValidation: function() {
-                    return false;
+                    return true;
+                },
+
+                validate: function() {
+                    if (!CKEDITOR.instances[this.options.instanceName]) {
+                        return true;
+                    }
+
+                    return 'wysiwyg' === CKEDITOR.instances[this.options.instanceName].mode;
                 },
 
                 setValue: function(value) {

@@ -13,7 +13,7 @@
  * @class SingleInternalLink
  * @constructor
  */
-define([], function() {
+define(['services/suluwebsite/reference-store'], function(referenceStore) {
 
     'use strict';
 
@@ -236,13 +236,23 @@ define([], function() {
         },
 
         loadSelectedNode = function() {
-            this.sandbox.util.load(getSingleUrl(this.options.url, this.data)).then(function(data) {
-                this.$input.val((data.title || this.sandbox.translate(this.options.translations.noTitle)) + ' (' + data.url + ')');
-            }.bind(this));
+            this.sandbox.util.load(getSingleUrl(this.options.url, this.data))
+                .fail(function() {
+                    setData.call(this);
+                }.bind(this))
+                .then(function(data) {
+                    this.$input.val((data.title || this.sandbox.translate(this.options.translations.noTitle)) + ' (' + data.url + ')');
+                }.bind(this));
         },
 
         getSingleUrl = function(url, data) {
             return url.replace('{/uuid}', (!!data ? '/' + data : ''));
+        },
+
+        prefillReferenceStore = function() {
+            if (!!this.data) {
+                referenceStore.add('content', this.data);
+            }
         };
 
     return {
@@ -251,6 +261,7 @@ define([], function() {
             this.options = this.sandbox.util.extend({}, defaults, this.options);
 
             render.call(this);
+            prefillReferenceStore.call(this);
         }
     };
 });

@@ -21,7 +21,9 @@ use Sulu\Bundle\MarkupBundle\Tag\TagInterface;
 class LinkTag implements TagInterface
 {
     const VALIDATE_UNPUBLISHED = 'unpublished';
+
     const VALIDATE_REMOVED = 'removed';
+
     const DEFAULT_PROVIDER = 'page';
 
     /**
@@ -54,11 +56,25 @@ class LinkTag implements TagInterface
             }
 
             $item = $contents[$provider . '-' . $attributes['href']];
+
+            $attributes['href'] = $item->getUrl();
+            $attributes['title'] = $this->getValue($attributes, 'title', $item->getTitle());
+
+            $htmlAttributes = array_map(
+                function ($value, $name) {
+                    if (in_array($name, ['provider', 'content', 'validation-state']) || empty($value)) {
+                        return;
+                    }
+
+                    return sprintf('%s="%s"', $name, $value);
+                },
+                $attributes,
+                array_keys($attributes)
+            );
+
             $result[$tag] = sprintf(
-                '<a href="%s" title="%s"%s>%s</a>',
-                $item->getUrl(),
-                $this->getValue($attributes, 'title', $item->getTitle()),
-                (!empty($attributes['target']) ? ' target="' . $attributes['target'] . '"' : ''),
+                '<a %s>%s</a>',
+                implode(' ', array_filter($htmlAttributes)),
                 $this->getValue($attributes, 'content', $item->getTitle())
             );
         }

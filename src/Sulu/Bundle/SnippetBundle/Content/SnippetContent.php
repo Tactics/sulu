@@ -16,23 +16,35 @@ use PHPCR\PropertyType;
 use PHPCR\Util\UUIDHelper;
 use Sulu\Bundle\SnippetBundle\Snippet\DefaultSnippetManagerInterface;
 use Sulu\Bundle\SnippetBundle\Snippet\SnippetResolverInterface;
+use Sulu\Bundle\SnippetBundle\Snippet\WrongSnippetTypeException;
+use Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStoreInterface;
 use Sulu\Component\Content\Compat\PropertyInterface;
 use Sulu\Component\Content\Compat\PropertyParameter;
 use Sulu\Component\Content\Compat\Structure\PageBridge;
 use Sulu\Component\Content\Compat\Structure\SnippetBridge;
 use Sulu\Component\Content\ComplexContentType;
 use Sulu\Component\Content\ContentTypeExportInterface;
-use Sulu\Component\Content\ContentTypeInterface;
+use Sulu\Component\Content\PreResolvableContentTypeInterface;
 
 /**
  * ContentType for Snippets.
  */
-class SnippetContent extends ComplexContentType implements ContentTypeExportInterface
+class SnippetContent extends ComplexContentType implements ContentTypeExportInterface, PreResolvableContentTypeInterface
 {
     /**
      * @var SnippetResolverInterface
      */
     private $snippetResolver;
+
+    /**
+     * @var DefaultSnippetManagerInterface
+     */
+    private $defaultSnippetManager;
+
+    /**
+     * @var ReferenceStoreInterface
+     */
+    private $referenceStore;
 
     /**
      * @var string
@@ -45,28 +57,24 @@ class SnippetContent extends ComplexContentType implements ContentTypeExportInte
     protected $defaultEnabled;
 
     /**
-     * @var DefaultSnippetManagerInterface
+     * @param DefaultSnippetManagerInterface $defaultSnippetManager
+     * @param SnippetResolverInterface $snippetResolver
+     * @param ReferenceStoreInterface $referenceStore
+     * @param true $defaultEnabled
+     * @param string $template
      */
-    private $defaultSnippetManager;
-
     public function __construct(
         DefaultSnippetManagerInterface $defaultSnippetManager,
         SnippetResolverInterface $snippetResolver,
+        ReferenceStoreInterface $referenceStore,
         $defaultEnabled,
         $template
     ) {
         $this->snippetResolver = $snippetResolver;
         $this->defaultSnippetManager = $defaultSnippetManager;
+        $this->referenceStore = $referenceStore;
         $this->defaultEnabled = $defaultEnabled;
         $this->template = $template;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getType()
-    {
-        return ContentTypeInterface::PRE_SAVE;
     }
 
     /**
@@ -190,26 +198,31 @@ class SnippetContent extends ComplexContentType implements ContentTypeExportInte
         $snippetType = $this->getParameterValue($property->getParams(), 'snippetType');
         $default = $this->getParameterValue($property->getParams(), 'default', false);
 
-        if (empty($ids) && $snippetType && $default && $this->defaultEnabled) {
-            $ids = [
-                $this->defaultSnippetManager->loadIdentifier($webspaceKey, $snippetType),
-            ];
+        $snippetArea = $default;
+        if (true === $snippetArea || 'true' === $snippetArea) {
+            $snippetArea = $snippetType;
+        }
 
-            // to filter null default snippet
-            $ids = array_filter($ids);
+        if (empty($ids) && $snippetArea && $this->defaultEnabled) {
+            $ids = $this->loadSnippetAreaIds($webspaceKey, $snippetArea, $locale);
         }
 
         return $this->snippetResolver->resolve($ids, $webspaceKey, $locale, $shadowLocale);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getReferencedUuids(PropertyInterface $property)
+    private function loadSnippetAreaIds($webspaceKey, $snippetArea, $locale)
     {
-        $data = $property->getValue();
+        try {
+            $snippet = $this->defaultSnippetManager->load($webspaceKey, $snippetArea, $locale);
+        } catch (WrongSnippetTypeException $exception) {
+            return [];
+        }
 
-        return $this->getUuids($data);
+        if (!$snippet) {
+            return [];
+        }
+
+        return [$snippet->getUuid()];
     }
 
     /**
@@ -267,5 +280,15 @@ class SnippetContent extends ComplexContentType implements ContentTypeExportInte
     ) {
         $property->setValue(json_decode($value));
         $this->write($node, $property, $userId, $webspaceKey, $languageCode, $segmentKey);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function preResolve(PropertyInterface $property)
+    {
+        foreach ($this->getUuids($property->getValue()) as $uuid) {
+            $this->referenceStore->add($uuid);
+        }
     }
 }

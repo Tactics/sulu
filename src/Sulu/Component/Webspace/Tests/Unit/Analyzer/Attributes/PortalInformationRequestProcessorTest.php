@@ -66,17 +66,76 @@ class PortalInformationRequestProcessorTest extends \PHPUnit_Framework_TestCase
             [],
             [],
             [],
-            ['HTTP_HOST' => 'sulu.lo', 'REQUEST_URI' => $config['path_info']]
+            ['HTTP_HOST' => 'sulu.lo']
         );
 
         $attributes = $this->portalInformationRequestProcessor->process(
             $request,
-            new RequestAttributes(['portalInformation' => $portalInformation])
+            new RequestAttributes(['portalInformation' => $portalInformation, 'path' => $config['path_info']])
         );
 
         $this->assertEquals($localization->getLocale(), $request->getLocale());
 
         $this->assertEquals('de_at', $attributes->getAttribute('localization'));
+        $this->assertEquals('sulu', $attributes->getAttribute('webspace')->getKey());
+        $this->assertEquals('sulu', $attributes->getAttribute('portal')->getKey());
+        $this->assertNull($attributes->getAttribute('segment'));
+
+        $this->assertEquals($expected['portal_url'], $attributes->getAttribute('portalUrl'));
+        $this->assertEquals($expected['redirect'], $attributes->getAttribute('redirect'));
+        $this->assertEquals($expected['resource_locator'], $attributes->getAttribute('resourceLocator'));
+        $this->assertEquals($expected['resource_locator_prefix'], $attributes->getAttribute('resourceLocatorPrefix'));
+        $this->assertEquals($expected['url_expression'], $attributes->getAttribute('urlExpression'));
+        $this->assertEquals(['post' => 1], $attributes->getAttribute('postParameter'));
+        $this->assertEquals(['get' => 1], $attributes->getAttribute('getParameter'));
+    }
+
+    /**
+     * @dataProvider provideProcess
+     */
+    public function testProcessWithoutLocaliziation($config, $expected = [])
+    {
+        $webspace = new Webspace();
+        $webspace->setKey('sulu');
+
+        $defaultLocalization = new Localization();
+        $defaultLocalization->setCountry('ch');
+        $defaultLocalization->setLanguage('it');
+
+        $portal = new Portal();
+        $portal->setKey('sulu');
+        $portal->setDefaultLocalization($defaultLocalization);
+
+        $portalInformation = new PortalInformation(
+            $config['match_type'],
+            $webspace,
+            $portal,
+            null,
+            $config['portal_url'],
+            null,
+            $config['redirect'],
+            null,
+            false,
+            $config['url_expression']
+        );
+
+        $request = new Request(
+            ['get' => 1],
+            ['post' => 1],
+            [],
+            [],
+            [],
+            ['HTTP_HOST' => 'sulu.lo']
+        );
+
+        $attributes = $this->portalInformationRequestProcessor->process(
+            $request,
+            new RequestAttributes(['portalInformation' => $portalInformation, 'path' => $config['path_info']])
+        );
+
+        $this->assertEquals('it_ch', $request->getLocale());
+
+        $this->assertEquals('it_ch', $attributes->getAttribute('localization'));
         $this->assertEquals('sulu', $attributes->getAttribute('webspace')->getKey());
         $this->assertEquals('sulu', $attributes->getAttribute('portal')->getKey());
         $this->assertNull($attributes->getAttribute('segment'));
@@ -121,12 +180,12 @@ class PortalInformationRequestProcessorTest extends \PHPUnit_Framework_TestCase
             [],
             [],
             [],
-            ['HTTP_HOST' => 'sulu.lo', 'REQUEST_URI' => $config['path_info']]
+            ['HTTP_HOST' => 'sulu.lo']
         );
 
         $attributes = $this->portalInformationRequestProcessor->process(
             $request,
-            new RequestAttributes(['portalInformation' => $portalInformation])
+            new RequestAttributes(['portalInformation' => $portalInformation, 'path' => $config['path_info']])
         );
 
         $this->assertEquals($localization->getLocale(), $request->getLocale());
@@ -146,34 +205,6 @@ class PortalInformationRequestProcessorTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals($expected['format'], $attributes->getAttribute('format'));
         $this->assertEquals(['post' => 1], $attributes->getAttribute('postParameter'));
         $this->assertEquals(['get' => 1], $attributes->getAttribute('getParameter'));
-    }
-
-    public function testProcessWithPort()
-    {
-        $portalInformation = new PortalInformation(
-            RequestAnalyzerInterface::MATCH_TYPE_FULL,
-            null,
-            null,
-            null,
-            'sulu.lo:8000/test'
-        );
-
-        $request = new Request(
-            [],
-            [],
-            [],
-            [],
-            [],
-            ['HTTP_HOST' => 'sulu.lo:8000', 'REQUEST_URI' => '/test/path/to']
-        );
-
-        $attributes = $this->portalInformationRequestProcessor->process(
-            $request,
-            new RequestAttributes(['portalInformation' => $portalInformation])
-        );
-
-        $this->assertEquals('/path/to', $attributes->getAttribute('resourceLocator'));
-        $this->assertEquals('/test', $attributes->getAttribute('resourceLocatorPrefix'));
     }
 
     public function testValidate()

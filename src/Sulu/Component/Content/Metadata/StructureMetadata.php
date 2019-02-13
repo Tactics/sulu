@@ -57,6 +57,11 @@ class StructureMetadata extends ItemMetadata
     public $internal;
 
     /**
+     * @var array
+     */
+    public $areas;
+
+    /**
      * Return a model property.
      *
      * @see StructureMetadata::getProperties()
@@ -111,6 +116,7 @@ class StructureMetadata extends ItemMetadata
         foreach ($this->children as $child) {
             if ($child instanceof SectionMetadata) {
                 $properties = array_merge($properties, $child->getChildren());
+
                 continue;
             }
 
@@ -211,5 +217,15 @@ class StructureMetadata extends ItemMetadata
     public function isInternal()
     {
         return $this->internal;
+    }
+
+    /**
+     * Return the structure areas.
+     *
+     * @return array
+     */
+    public function getAreas()
+    {
+        return $this->areas;
     }
 }

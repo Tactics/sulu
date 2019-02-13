@@ -16,6 +16,7 @@ use Sulu\Component\Content\Compat\StructureInterface;
 use Sulu\Component\Content\ContentTypeManagerInterface;
 use Sulu\Component\Content\Document\Behavior\LocalizedAuthorBehavior;
 use Sulu\Component\Content\Extension\ExtensionManagerInterface;
+use Sulu\Component\Content\PreResolvableContentTypeInterface;
 
 /**
  * Class that "resolves" the view data for a given structure.
@@ -66,6 +67,7 @@ class StructureResolver implements StructureResolverInterface
             $data['urls'] = $structure->getUrls();
             $data['published'] = $structure->getPublished();
             $data['shadowBaseLocale'] = $structure->getShadowBaseLanguage();
+            $data['webspaceKey'] = $structure->getWebspaceKey();
 
             foreach ($data['extension'] as $name => $value) {
                 $extension = $this->extensionManager->getExtension($structure->getKey(), $name);
@@ -76,6 +78,15 @@ class StructureResolver implements StructureResolverInterface
             if ($document instanceof LocalizedAuthorBehavior) {
                 $data['authored'] = $document->getAuthored();
                 $data['author'] = $document->getAuthor();
+            }
+        }
+
+        // pre-resolve content-types
+        foreach ($structure->getProperties(true) as $property) {
+            $contentType = $this->contentTypeManager->get($property->getContentTypeName());
+
+            if ($contentType instanceof PreResolvableContentTypeInterface) {
+                $contentType->preResolve($property);
             }
         }
 

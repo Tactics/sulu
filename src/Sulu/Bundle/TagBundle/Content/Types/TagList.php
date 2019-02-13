@@ -16,7 +16,6 @@ use Sulu\Bundle\TagBundle\Tag\TagManagerInterface;
 use Sulu\Component\Content\Compat\PropertyInterface;
 use Sulu\Component\Content\ComplexContentType;
 use Sulu\Component\Content\ContentTypeExportInterface;
-use Sulu\Component\Content\ContentTypeInterface;
 
 /**
  * Content Type for the TagList, uses the TagManager-Service and the AutoCompleteList from Husky.
@@ -44,17 +43,6 @@ class TagList extends ComplexContentType implements ContentTypeExportInterface
     }
 
     /**
-     * returns type of ContentType
-     * PRE_SAVE or POST_SAVE.
-     *
-     * @return int
-     */
-    public function getType()
-    {
-        return ContentTypeInterface::PRE_SAVE;
-    }
-
-    /**
      * {@inheritdoc}
      */
     public function read(NodeInterface $node, PropertyInterface $property, $webspaceKey, $languageCode, $segmentKey)
@@ -75,7 +63,7 @@ class TagList extends ComplexContentType implements ContentTypeExportInterface
         $segmentKey
     ) {
         $tagIds = [];
-        $tags = $property->getValue() === null ? [] : $property->getValue();
+        $tags = null === $property->getValue() ? [] : $property->getValue();
 
         foreach ($tags as $tag) {
             $tagIds[] = $this->tagManager->findOrCreateByName($tag, $userId)->getId();

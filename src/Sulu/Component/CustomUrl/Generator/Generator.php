@@ -20,6 +20,7 @@ use Sulu\Component\Webspace\Url\ReplacerInterface;
 class Generator implements GeneratorInterface
 {
     const PREFIX_REGEX = '/^([^\/]*)(\*)(.*)$/';
+
     const POSTFIX_REGEX = '/^.*\/.*\*.*$/';
 
     /**
@@ -89,7 +90,7 @@ class Generator implements GeneratorInterface
 
         $domain = $this->urlReplacer->replaceLanguage($domain, $locale->getLanguage());
         $domain = $this->urlReplacer->replaceCountry($domain, $locale->getCountry());
-        $domain = $this->urlReplacer->replaceLocalization($domain, $locale->getLocalization());
+        $domain = $this->urlReplacer->replaceLocalization($domain, $locale->getLocale());
 
         return $this->urlReplacer->cleanup($domain);
     }

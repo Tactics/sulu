@@ -62,7 +62,7 @@ class ContentPathTwigExtension extends \Twig_Extension implements ContentPathInt
     {
         // if the request analyzer null or a route is passed which is relative or inclusive a domain nothing should be
         // done (this is important for external-links in navigations)
-        if (!$this->requestAnalyzer || strpos($route, '/') !== 0) {
+        if (!$this->requestAnalyzer || 0 !== strpos($route, '/')) {
             return $route;
         }
 
@@ -86,6 +86,13 @@ class ContentPathTwigExtension extends \Twig_Extension implements ContentPathInt
             $domain,
             $scheme
         );
+
+        $port = $this->requestAnalyzer->getAttribute('port');
+        if ($url && false !== strpos($url, $host)) {
+            if (!('http' == $scheme && 80 == $port) && !('https' == $scheme && 443 == $port)) {
+                $url = str_replace($host, $host . ':' . $port, $url);
+            }
+        }
 
         if (!$withoutDomain && !$url) {
             $url = $this->webspaceManager->findUrlByResourceLocator(

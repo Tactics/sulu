@@ -24,7 +24,7 @@ define([
     'text!./versions.html',
     'text!./preview.html',
     'text!./formats.html',
-    'text!./categories.html'
+    'text!./taxonomies.html'
 ], function(
     config,
     croppingSlide,
@@ -37,7 +37,7 @@ define([
     versionsTemplate,
     previewTemplate,
     formatsTemplate,
-    categoriesTemplate
+    taxonomiesTemplate
 ) {
 
     'use strict';
@@ -296,8 +296,8 @@ define([
 
             tabs.push(
                 {
-                    title: this.sandbox.translate('sulu.media.categories'),
-                    data: this.renderCategoriesTab()
+                    title: this.sandbox.translate('sulu.media.taxonomies'),
+                    data: this.renderTaxonomiesTab()
                 }
             );
 
@@ -334,7 +334,7 @@ define([
                         supportKeyInput: false,
                         slides: [
                             {
-                                title: this.media.title,
+                                title: this.sandbox.util.escapeHtml(this.media.title),
                                 subTitle: this.sandbox.util.cropMiddle(
                                     this.media.mimeType + ', ' + this.sandbox.util.formatBytes(this.media.size),
                                     32
@@ -460,11 +460,12 @@ define([
         /**
          * Renders the content for the categories tab
          */
-        renderCategoriesTab: function() {
-            return _.template(categoriesTemplate, {
+        renderTaxonomiesTab: function() {
+            return _.template(taxonomiesTemplate, {
                 categoryLocale: this.options.locale,
                 media: this.media,
-                translate: this.sandbox.translate
+                translate: this.sandbox.translate,
+                hasAudienceTargeting: config.has('sulu_audience_targeting')
             });
         },
 
@@ -612,7 +613,7 @@ define([
                 'husky.overlay.media-edit.language-changed', this.languageChangedSingle.bind(this)
             );
 
-            this.sandbox.dom.on(this.$el, 'click', function(e) {
+            this.sandbox.dom.on(this.$el, 'click.clipboard-copy', function(e) {
                 var $target = $(e.currentTarget),
                     $item = $target.parents('.media-edit-link'),
                     $info = $target.siblings('.media-edit-copied');
@@ -628,6 +629,8 @@ define([
                 }, 2000, $target, $item, $info);
             }.bind(this), '.fa-clipboard');
 
+            this.sandbox.dom.on(this.$el, 'click.version-remove', this.createVersionDeleteOverlay.bind(this), '.media-edit-link-action-remove');
+
             this.sandbox.on('husky.dropzone.file-version.uploading', function() {
                 this.sandbox.emit('husky.overlay.alert.close');
             }.bind(this));
@@ -640,6 +643,32 @@ define([
         },
 
         /**
+         * Create version delete overlay.
+         */
+        createVersionDeleteOverlay: function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            var $target = $(event.currentTarget);
+            var version = $target.attr('data-version');
+            var mediaId = this.media.id;
+            var $container = this.sandbox.dom.createElement('<div/>');
+
+            $target.attr('disabled', true);
+
+            this.sandbox.dom.append(this.$el, $container);
+
+            this.sandbox.sulu.showDeleteDialog(function(wasConfirmed) {
+                if (wasConfirmed) {
+                    $.ajax('/admin/api/media/' + mediaId + '/versions/' + version + '?locale=' + this.options.locale,  {method: 'DELETE'});
+                    $target.closest('.media-edit-link').remove();
+                } else {
+                    $target.attr('disabled', false);
+                }
+            }.bind(this));
+        },
+
+        /**
          * Removes events related to the single-edit overlay
          */
         unbindSingleOverlayEvents: function() {
@@ -647,6 +676,8 @@ define([
             this.sandbox.off('husky.tabs.overlaymedia-edit.item.select');
             this.sandbox.off('husky.dropzone.file-version.files-added');
             this.sandbox.off('husky.dropzone.preview-image.files-added');
+            this.sandbox.dom.off(this.$el, 'click.version-remove');
+            this.sandbox.dom.off(this.$el, 'click.clipboard-copy');
         },
 
         /**
@@ -1037,7 +1068,7 @@ define([
             var mediaId = this.media.id;
 
             $.ajax({
-                url: resetPreviewUrl(mediaId),
+                url: resetPreviewUrl.call(this, mediaId),
                 type: 'DELETE',
                 success: function() {
                     this.previewImageChangeHandler.call(this);

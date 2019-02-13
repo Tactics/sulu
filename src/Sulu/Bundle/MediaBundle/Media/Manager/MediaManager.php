@@ -15,6 +15,7 @@ use Doctrine\DBAL\DBALException;
 use Doctrine\ORM\EntityManager;
 use FFMpeg\Exception\ExecutableNotFoundException;
 use FFMpeg\FFProbe;
+use Sulu\Bundle\AudienceTargetingBundle\Entity\TargetGroupRepositoryInterface;
 use Sulu\Bundle\CategoryBundle\Entity\CategoryRepositoryInterface;
 use Sulu\Bundle\MediaBundle\Api\Media;
 use Sulu\Bundle\MediaBundle\Entity\Collection;
@@ -68,6 +69,11 @@ class MediaManager implements MediaManagerInterface
      * @var CategoryRepositoryInterface
      */
     protected $categoryRepository;
+
+    /**
+     * @var TargetGroupRepositoryInterface
+     */
+    protected $targetGroupRepository;
 
     /**
      * @var EntityManager
@@ -148,6 +154,8 @@ class MediaManager implements MediaManagerInterface
      * @param MediaRepositoryInterface $mediaRepository
      * @param CollectionRepositoryInterface $collectionRepository
      * @param UserRepositoryInterface $userRepository
+     * @param CategoryRepositoryInterface $categoryRepository
+     * @param TargetGroupRepositoryInterface $targetGroupRepository
      * @param EntityManager $em
      * @param StorageInterface $storage
      * @param FileValidatorInterface $validator
@@ -179,12 +187,14 @@ class MediaManager implements MediaManagerInterface
         FFProbe $ffprobe,
         $permissions,
         $downloadPath,
-        $maxFileSize
+        $maxFileSize,
+        TargetGroupRepositoryInterface $targetGroupRepository = null
     ) {
         $this->mediaRepository = $mediaRepository;
         $this->collectionRepository = $collectionRepository;
         $this->userRepository = $userRepository;
         $this->categoryRepository = $categoryRepository;
+        $this->targetGroupRepository = $targetGroupRepository;
         $this->em = $em;
         $this->storage = $storage;
         $this->validator = $validator;
@@ -297,12 +307,24 @@ class MediaManager implements MediaManagerInterface
         $properties = [];
 
         try {
-            // if the file is a video we add the duration
+            // if the file is a video we add the properties related to it
             if (fnmatch('video/*', $mimeType)) {
+                // Duration
                 $properties['duration'] = $this->ffprobe->format($uploadedFile->getPathname())->get('duration');
+
+                // Dimensions
+                try {
+                    $dimensions = $this->ffprobe->streams($uploadedFile->getPathname())->videos()->first()->getDimensions();
+                    $properties['width'] = $dimensions->getWidth();
+                    $properties['height'] = $dimensions->getHeight();
+                } catch (InvalidArgumentException $e) {
+                    // Exception is thrown if the video stream could not be obtained
+                } catch (RuntimeException $e) {
+                    // Exception is thrown if the dimension could not be extracted
+                }
             }
         } catch (ExecutableNotFoundException $e) {
-            // Exception is thrown if ffmpeg is not installed -> duration is not set
+            // Exception is thrown if ffmpeg is not installed -> video properties are not set
         }
 
         return $properties;
@@ -362,15 +384,7 @@ class MediaManager implements MediaManagerInterface
 
         $version = $file->getVersion();
 
-        $currentFileVersion = null;
-
-        foreach ($file->getFileVersions() as $fileVersion) {
-            /** @var FileVersion $fileVersion */
-            if ($version == $fileVersion->getVersion()) {
-                $currentFileVersion = $fileVersion;
-                break;
-            }
-        }
+        $currentFileVersion = $file->getFileVersion($version);
 
         if (!$currentFileVersion) {
             throw new FileVersionNotFoundException($mediaEntity->getId(), $version);
@@ -553,14 +567,14 @@ class MediaManager implements MediaManagerInterface
     {
         foreach ($data as $attribute => $value) {
             if ($value ||
-                ($attribute === 'tags' && $value !== null) ||
-                ($attribute === 'size' && $value !== null) ||
-                ($attribute === 'description' && $value !== null) ||
-                ($attribute === 'copyright' && $value !== null) ||
-                ($attribute === 'credits' && $value !== null) ||
-                ($attribute === 'categories' && $value !== null) ||
-                ($attribute === 'focusPointX' && $value !== null) ||
-                ($attribute === 'focusPointY' && $value !== null)
+                ('tags' === $attribute && null !== $value) ||
+                ('size' === $attribute && null !== $value) ||
+                ('description' === $attribute && null !== $value) ||
+                ('copyright' === $attribute && null !== $value) ||
+                ('credits' === $attribute && null !== $value) ||
+                ('categories' === $attribute && null !== $value) ||
+                ('focusPointX' === $attribute && null !== $value) ||
+                ('focusPointY' === $attribute && null !== $value)
             ) {
                 switch ($attribute) {
                     case 'size':
@@ -652,6 +666,18 @@ class MediaManager implements MediaManagerInterface
                             }
                         }
                         break;
+                    case 'targetGroups':
+                        $targetGroupIds = $value;
+                        $media->removeTargetGroups();
+
+                        if (is_array($targetGroupIds) && !empty($targetGroupIds)) {
+                            $targetGroups = $this->targetGroupRepository->findByIds($targetGroupIds);
+
+                            foreach ($targetGroups as $targetGroup) {
+                                $media->addTargetGroup($targetGroup);
+                            }
+                        }
+                        break;
                     case 'focusPointX':
                         $media->setFocusPointX($value);
                         break;
@@ -713,6 +739,11 @@ class MediaManager implements MediaManagerInterface
                 );
 
                 $this->storage->remove($fileVersion->getStorageOptions());
+
+                foreach ($fileVersion->getMeta() as $fileVersionMeta) {
+                    // this will trigger massive-search deindex
+                    $this->em->remove($fileVersionMeta);
+                }
             }
         }
 
@@ -728,7 +759,7 @@ class MediaManager implements MediaManagerInterface
         try {
             $mediaEntity = $this->mediaRepository->findMediaById($id);
 
-            if ($mediaEntity === null) {
+            if (null === $mediaEntity) {
                 throw new MediaNotFoundException($id);
             }
 
@@ -801,7 +832,7 @@ class MediaManager implements MediaManagerInterface
         /** @var \Sulu\Bundle\MediaBundle\Entity\MediaInterface $previewImage */
         $previewImage = $media->getEntity()->getPreviewImage();
 
-        if ($previewImage !== null) {
+        if (null !== $previewImage) {
             /** @var FileVersion $latestVersion */
             $latestVersion = null;
 
@@ -813,7 +844,7 @@ class MediaManager implements MediaManagerInterface
                 break;
             }
 
-            if ($latestVersion !== null) {
+            if (null !== $latestVersion) {
                 $media->setFormats(
                     $this->formatManager->getFormats(
                         $previewImage->getId(),
@@ -853,7 +884,7 @@ class MediaManager implements MediaManagerInterface
 
         // set properties
         $properties = $media->getFileVersion()->getProperties();
-        if ($properties !== null) {
+        if (null !== $properties) {
             $media->setProperties($properties);
         }
 
@@ -889,7 +920,7 @@ class MediaManager implements MediaManagerInterface
             ],
             [
                 $id,
-                $fileName,
+                rawurlencode($fileName),
             ],
             $this->downloadPath
         ) . '?v=' . $version;
@@ -910,7 +941,13 @@ class MediaManager implements MediaManagerInterface
             return;
         }
 
-        return $this->tokenStorage->getToken()->getUser();
+        $user = $this->tokenStorage->getToken()->getUser();
+
+        if ($user instanceof UserInterface) {
+            return $user;
+        }
+
+        return;
     }
 
     /**
@@ -922,7 +959,7 @@ class MediaManager implements MediaManagerInterface
      */
     private function getNormalizedFileName($originalFileName)
     {
-        if (strpos($originalFileName, '.') !== false) {
+        if (false !== strpos($originalFileName, '.')) {
             $pathParts = pathinfo($originalFileName);
             $fileName = $this->pathCleaner->cleanup($pathParts['filename']);
             $fileName .= '.' . $pathParts['extension'];

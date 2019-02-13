@@ -142,7 +142,7 @@ class Portal
     public function getLocalization($locale)
     {
         foreach ($this->getLocalizations() as $localization) {
-            if ($locale === $localization->getLocalization()) {
+            if ($locale === $localization->getLocale()) {
                 return $localization;
             }
         }
@@ -254,9 +254,6 @@ class Portal
         return $this->webspace;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function toArray($depth = null)
     {
         $res = [];

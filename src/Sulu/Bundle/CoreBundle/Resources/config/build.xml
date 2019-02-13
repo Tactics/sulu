@@ -21,11 +21,11 @@
             <tag name="massive_build.builder" />
         </service>
 
-        <service id="sulu_core.build.builder.fixtures" class="%sulu_core.build.builder.fixtures.class%">
+        <service id="sulu_core.build.builder.cache" class="%sulu_core.build.builder.cache.class%">
             <tag name="massive_build.builder" />
         </service>
 
-        <service id="sulu_core.build.builder.cache" class="%sulu_core.build.builder.cache.class%">
+        <service id="sulu_core.build.builder.fixtures" class="%sulu_core.build.builder.fixtures.class%">
             <tag name="massive_build.builder" />
         </service>
 

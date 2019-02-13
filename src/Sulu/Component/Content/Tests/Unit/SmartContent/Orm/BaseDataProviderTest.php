@@ -14,6 +14,7 @@ namespace Sulu\Component\Content\Tests\Unit\SmartContent\Orm;
 use JMS\Serializer\SerializationContext;
 use JMS\Serializer\SerializerInterface;
 use Prophecy\Argument;
+use Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStoreInterface;
 use Sulu\Component\SmartContent\Configuration\ProviderConfigurationInterface;
 use Sulu\Component\SmartContent\DataProviderResult;
 use Sulu\Component\SmartContent\Orm\BaseDataProvider;
@@ -265,7 +266,6 @@ class BaseDataProviderTest extends \PHPUnit_Framework_TestCase
         $this->assertInstanceOf(DataProviderResult::class, $result);
         $this->assertEquals($hasNextPage, $result->getHasNextPage());
         $this->assertEquals($items, $result->getItems());
-        $this->assertEquals([], $result->getReferencedUuids());
     }
 
     /**
@@ -324,7 +324,78 @@ class BaseDataProviderTest extends \PHPUnit_Framework_TestCase
 
         $this->assertInstanceOf(DataProviderResult::class, $result);
         $this->assertEquals($hasNextPage, $result->getHasNextPage());
-        $this->assertEquals([], $result->getReferencedUuids());
+        $this->assertCount(count($items), $result->getItems());
+
+        for ($i = 0, $len = count($items); $i < $len; ++$i) {
+            $expected = $items[$i];
+            $item = $result->getItems()[$i];
+
+            $this->assertEquals($expected['id'], $item->getResource()->getId());
+            $this->assertEquals($expected['id'], $item['id']);
+        }
+    }
+
+    /**
+     * @dataProvider filtersProvider
+     */
+    public function testResolveResourceItemsWithReferenceStore(
+        array $filters,
+        $limit,
+        $page,
+        $pageSize,
+        $options,
+        $repositoryResult,
+        $hasNextPage,
+        $items
+    ) {
+        $mockedItems = array_map(
+            function ($item) {
+                $mock = $this->prophesize(ResourceItemInterface::class);
+                $mock->getId()->willReturn($item['id']);
+
+                return $mock->reveal();
+            },
+            $repositoryResult
+        );
+
+        $repository = $this->prophesize(DataProviderRepositoryInterface::class);
+        $repository->findByFilters($filters, $page, $pageSize, $limit, 'en', [])->shouldBeCalled()->willReturn(
+            $mockedItems
+        );
+
+        $serializer = $this->prophesize(SerializerInterface::class);
+        $serializer->serialize(
+            Argument::type(ResourceItemInterface::class),
+            'array',
+            Argument::type(SerializationContext::class)
+        )->will(
+            function ($args) {
+                return ['id' => $args[0]->getId()];
+            }
+        );
+
+        $referenceStore = $this->prophesize(ReferenceStoreInterface::class);
+        foreach ($items as $item) {
+            $referenceStore->add($item['id'])->shouldBeCalled();
+        }
+
+        /** @var BaseDataProvider $provider */
+        $provider = $this->getMockForAbstractClass(
+            BaseDataProvider::class,
+            [$repository->reveal(), $serializer->reveal(), $referenceStore->reveal()]
+        );
+
+        $result = $provider->resolveResourceItems(
+            $filters,
+            [],
+            ['locale' => 'en', 'webspace' => 'sulu_io'],
+            $limit,
+            $page,
+            $pageSize
+        );
+
+        $this->assertInstanceOf(DataProviderResult::class, $result);
+        $this->assertEquals($hasNextPage, $result->getHasNextPage());
         $this->assertCount(count($items), $result->getItems());
 
         for ($i = 0, $len = count($items); $i < $len; ++$i) {

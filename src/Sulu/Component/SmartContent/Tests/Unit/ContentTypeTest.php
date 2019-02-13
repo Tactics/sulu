@@ -11,15 +11,21 @@
 
 namespace Sulu\Component\SmartContent\Tests\Unit;
 
+use Prophecy\Argument;
+use Sulu\Bundle\AudienceTargetingBundle\TargetGroup\TargetGroupStoreInterface;
 use Sulu\Bundle\TagBundle\Tag\TagManagerInterface;
+use Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStoreInterface;
 use Sulu\Component\Category\Request\CategoryRequestHandlerInterface;
+use Sulu\Component\Content\Compat\PropertyInterface;
 use Sulu\Component\Content\Compat\PropertyParameter;
+use Sulu\Component\Content\Compat\StructureInterface;
 use Sulu\Component\SmartContent\Configuration\ProviderConfiguration;
 use Sulu\Component\SmartContent\ContentType as SmartContent;
 use Sulu\Component\SmartContent\DataProviderInterface;
 use Sulu\Component\SmartContent\DataProviderPool;
 use Sulu\Component\SmartContent\DataProviderPoolInterface;
 use Sulu\Component\SmartContent\DataProviderResult;
+use Sulu\Component\SmartContent\Exception\PageOutOfBoundsException;
 use Sulu\Component\Tag\Request\TagRequestHandlerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -34,11 +40,6 @@ interface MyNodeInterface extends \PHPCR\NodeInterface, \Iterator
  */
 class ContentTypeTest extends \PHPUnit_Framework_TestCase
 {
-    /**
-     * @var SmartContent
-     */
-    private $smartContent;
-
     /**
      * @var TagManagerInterface
      */
@@ -74,6 +75,21 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
      */
     private $contentDataProvider;
 
+    /**
+     * @var TargetGroupStoreInterface
+     */
+    private $targetGroupStore;
+
+    /**
+     * @var ReferenceStoreInterface
+     */
+    private $categoryReferenceStore;
+
+    /**
+     * @var ReferenceStoreInterface
+     */
+    private $tagReferenceStore;
+
     public function setUp()
     {
         $this->contentDataProvider = $this->prophesize(DataProviderInterface::class);
@@ -106,15 +122,6 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
         $this->categoryRequestHandler = $this->prophesize(CategoryRequestHandlerInterface::class);
         $this->categoryRequestHandler->getCategories('categories')->willReturn([]);
 
-        $this->smartContent = new SmartContent(
-            $this->dataProviderPool,
-            $this->tagManager,
-            $this->requestStack,
-            $this->tagRequestHandler->reveal(),
-            $this->categoryRequestHandler->reveal(),
-            'SuluContentBundle:Template:content-types/smart_content.html.twig'
-        );
-
         $this->tagManager->expects($this->any())->method('resolveTagIds')->will(
             $this->returnValueMap(
                 [
@@ -123,13 +130,20 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
             )
         );
 
-        $this->tagManager->expects($this->any())->method('resolveTagName')->will(
+        $this->tagManager->expects($this->any())->method('resolveTagNames')->will(
             $this->returnValueMap(
                 [
                     [['Tag1', 'Tag2'], [1, 2]],
+                    [['Tag1'], [1]],
+                    [['Tag2'], [2]],
                 ]
             )
         );
+
+        $this->targetGroupStore = $this->prophesize(TargetGroupStoreInterface::class);
+
+        $this->categoryReferenceStore = $this->prophesize(ReferenceStoreInterface::class);
+        $this->tagReferenceStore = $this->prophesize(ReferenceStoreInterface::class);
     }
 
     private function getProviderConfiguration()
@@ -146,14 +160,36 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
 
     public function testTemplate()
     {
+        $smartContent = new SmartContent(
+            $this->dataProviderPool,
+            $this->tagManager,
+            $this->requestStack,
+            $this->tagRequestHandler->reveal(),
+            $this->categoryRequestHandler->reveal(),
+            $this->categoryReferenceStore->reveal(),
+            $this->tagReferenceStore->reveal(),
+            'SuluContentBundle:Template:content-types/smart_content.html.twig'
+        );
+
         $this->assertEquals(
             'SuluContentBundle:Template:content-types/smart_content.html.twig',
-            $this->smartContent->getTemplate()
+            $smartContent->getTemplate()
         );
     }
 
     public function testWrite()
     {
+        $smartContent = new SmartContent(
+            $this->dataProviderPool,
+            $this->tagManager,
+            $this->requestStack,
+            $this->tagRequestHandler->reveal(),
+            $this->categoryRequestHandler->reveal(),
+            $this->categoryReferenceStore->reveal(),
+            $this->tagReferenceStore->reveal(),
+            'SuluContentBundle:Template:content-types/smart_content.html.twig'
+        );
+
         $node = $this->getMockForAbstractClass(
             MyNodeInterface::class,
             [],
@@ -165,7 +201,7 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
         );
 
         $property = $this->getMockForAbstractClass(
-            'Sulu\Component\Content\Compat\PropertyInterface',
+            PropertyInterface::class,
             [],
             '',
             true,
@@ -203,11 +239,22 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
             )
         );
 
-        $this->smartContent->write($node, $property, 0, 'test', 'en', 's');
+        $smartContent->write($node, $property, 0, 'test', 'en', 's');
     }
 
     public function testRead()
     {
+        $smartContent = new SmartContent(
+            $this->dataProviderPool,
+            $this->tagManager,
+            $this->requestStack,
+            $this->tagRequestHandler->reveal(),
+            $this->categoryRequestHandler->reveal(),
+            $this->categoryReferenceStore->reveal(),
+            $this->tagReferenceStore->reveal(),
+            'SuluContentBundle:Template:content-types/smart_content.html.twig'
+        );
+
         $config = [
             'tags' => ['Tag1', 'Tag2'],
             'limitResult' => '2',
@@ -224,7 +271,7 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
         );
 
         $property = $this->getMockForAbstractClass(
-            'Sulu\Component\Content\Compat\PropertyInterface',
+            PropertyInterface::class,
             [],
             '',
             true,
@@ -248,13 +295,24 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
 
         $property->expects($this->exactly(1))->method('setValue')->with($config);
 
-        $this->smartContent->read($node, $property, 'test', 'en', 's');
+        $smartContent->read($node, $property, 'test', 'en', 's');
     }
 
     public function testGetViewData()
     {
+        $smartContent = new SmartContent(
+            $this->dataProviderPool,
+            $this->tagManager,
+            $this->requestStack,
+            $this->tagRequestHandler->reveal(),
+            $this->categoryRequestHandler->reveal(),
+            $this->categoryReferenceStore->reveal(),
+            $this->tagReferenceStore->reveal(),
+            'SuluContentBundle:Template:content-types/smart_content.html.twig'
+        );
+
         $property = $this->getMockForAbstractClass(
-            'Sulu\Component\Content\Compat\PropertyInterface',
+            PropertyInterface::class,
             [],
             '',
             true,
@@ -262,9 +320,7 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
             true,
             ['getValue', 'getParams']
         );
-        $structure = $this->getMockForAbstractClass(
-            'Sulu\Component\Content\Compat\StructureInterface'
-        );
+        $structure = $this->prophesize(StructureInterface::class);
 
         $config = ['dataSource' => 'some-uuid'];
         $parameter = ['max_per_page' => new PropertyParameter('max_per_page', '5')];
@@ -277,7 +333,7 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
         $property->expects($this->any())->method('getParams')
             ->will($this->returnValue($parameter));
         $property->expects($this->exactly(3))->method('getStructure')
-            ->will($this->returnValue($structure));
+            ->will($this->returnValue($structure->reveal()));
 
         $this->contentDataProvider->resolveResourceItems(
             [
@@ -294,6 +350,7 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
             ],
             [
                 'provider' => new PropertyParameter('provider', 'content'),
+                'alias' => null,
                 'page_parameter' => new PropertyParameter('page_parameter', 'p'),
                 'tags_parameter' => new PropertyParameter('tags_parameter', 'tags'),
                 'categories_parameter' => new PropertyParameter('categories_parameter', 'categories'),
@@ -320,32 +377,64 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
                     'sorting' => false,
                     'limit' => true,
                     'presentAs' => true,
+                    'audienceTargeting' => false,
                 ],
                 'datasource' => null,
                 'max_per_page' => new PropertyParameter('max_per_page', '5'),
                 'deep_link' => new PropertyParameter('deep_link', ''),
+                'exclude_duplicates' => new PropertyParameter('exclude_duplicates', false),
             ],
-            ['webspaceKey' => null, 'locale' => null],
+            ['webspaceKey' => 'sulu_io', 'locale' => 'de'],
             null,
             1,
             5
-        )->willReturn(new DataProviderResult([1, 2, 3, 4, 5, 6], true, [1, 2, 3, 4, 5, 6]));
+        )->willReturn(new DataProviderResult([1, 2, 3, 4, 5, 6], true));
 
-        $structure->expects($this->any())->method('getUuid')->will($this->returnValue('123-123-123'));
+        $structure->getUuid()->willReturn('123-123-123');
+        $structure->getWebspaceKey()->willReturn('sulu_io');
+        $structure->getLanguageCode()->willReturn('de');
 
         $this->request->expects($this->at(0))->method('get')
             ->with($this->equalTo('p'))
             ->willReturn(1);
 
-        $viewData = $this->smartContent->getViewData($property);
+        $viewData = $smartContent->getViewData($property);
 
         $this->assertContains(array_merge($config, ['page' => 1, 'hasNextPage' => true]), $viewData);
     }
 
     public function testGetContentData()
     {
-        $property = $this->getContentDataProperty();
-        $contentData = $this->smartContent->getContentData($property);
+        $smartContent = new SmartContent(
+            $this->dataProviderPool,
+            $this->tagManager,
+            $this->requestStack,
+            $this->tagRequestHandler->reveal(),
+            $this->categoryRequestHandler->reveal(),
+            $this->categoryReferenceStore->reveal(),
+            $this->tagReferenceStore->reveal(),
+            'SuluContentBundle:Template:content-types/smart_content.html.twig'
+        );
+
+        $property = $this->getContentDataProperty(
+            [
+                'dataSource' => '123-123-123',
+                'categories' => [1],
+                'websiteCategories' => [2],
+                'tags' => [1],
+                'websiteTags' => [2],
+            ]
+        );
+
+        $this->tagRequestHandler->getTags('tags')->willReturn(['Tag2']);
+        $this->categoryRequestHandler->getCategories('categories')->willReturn([2]);
+
+        $this->categoryReferenceStore->add(1)->shouldBeCalled();
+        $this->categoryReferenceStore->add(2)->shouldBeCalled();
+        $this->tagReferenceStore->add(1)->shouldBeCalled();
+        $this->tagReferenceStore->add(2)->shouldBeCalled();
+
+        $contentData = $smartContent->getContentData($property);
 
         $this->assertEquals(
             [
@@ -360,20 +449,21 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
         );
     }
 
-    public function testGetReferencedUuids()
-    {
-        $property = $this->getContentDataProperty(
-            ['tags' => [], 'dataSource' => '123-123-123', 'referencedUuids' => [1, 2, 3, 4, 5, 6]]
-        );
-        $uuids = $this->smartContent->getReferencedUuids($property);
-
-        $this->assertEquals([1, 2, 3, 4, 5, 6], $uuids);
-    }
-
     public function testGetContentDataPaged()
     {
+        $smartContent = new SmartContent(
+            $this->dataProviderPool,
+            $this->tagManager,
+            $this->requestStack,
+            $this->tagRequestHandler->reveal(),
+            $this->categoryRequestHandler->reveal(),
+            $this->categoryReferenceStore->reveal(),
+            $this->tagReferenceStore->reveal(),
+            'SuluContentBundle:Template:content-types/smart_content.html.twig'
+        );
+
         $property = $this->getMockForAbstractClass(
-            'Sulu\Component\Content\Compat\PropertyInterface',
+            PropertyInterface::class,
             [],
             '',
             true,
@@ -381,9 +471,7 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
             true,
             ['getValue', 'getParams']
         );
-        $structure = $this->getMockForAbstractClass(
-            'Sulu\Component\Content\Compat\StructureInterface'
-        );
+        $structure = $this->prophesize(StructureInterface::class);
 
         $this->request->expects($this->at(0))->method('get')
             ->with($this->equalTo('p'))
@@ -395,7 +483,7 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
         $property->expects($this->any())->method('getParams')
             ->will($this->returnValue(['max_per_page' => new PropertyParameter('max_per_page', '5')]));
         $property->expects($this->exactly(3))->method('getStructure')
-            ->will($this->returnValue($structure));
+            ->will($this->returnValue($structure->reveal()));
 
         $this->contentDataProvider->resolveResourceItems(
             [
@@ -410,6 +498,7 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
             ],
             [
                 'provider' => new PropertyParameter('provider', 'content'),
+                'alias' => null,
                 'page_parameter' => new PropertyParameter('page_parameter', 'p'),
                 'tags_parameter' => new PropertyParameter('tags_parameter', 'tags'),
                 'categories_parameter' => new PropertyParameter('categories_parameter', 'categories'),
@@ -436,20 +525,24 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
                     'sorting' => false,
                     'limit' => true,
                     'presentAs' => true,
+                    'audienceTargeting' => false,
                 ],
                 'datasource' => null,
                 'max_per_page' => new PropertyParameter('max_per_page', '5'),
                 'deep_link' => new PropertyParameter('deep_link', ''),
+                'exclude_duplicates' => new PropertyParameter('exclude_duplicates', false),
             ],
-            ['webspaceKey' => null, 'locale' => null],
+            ['webspaceKey' => 'sulu_io', 'locale' => 'de'],
             null,
             1,
             5
-        )->willReturn(new DataProviderResult([1, 2, 3, 4, 5], true, [1, 2, 3, 4, 5]));
+        )->willReturn(new DataProviderResult([1, 2, 3, 4, 5], true));
 
-        $structure->expects($this->any())->method('getUuid')->will($this->returnValue('123-123-123'));
+        $structure->getUuid()->willReturn('123-123-123');
+        $structure->getWebspaceKey()->willReturn('sulu_io');
+        $structure->getLanguageCode()->willReturn('de');
 
-        $contentData = $this->smartContent->getContentData($property);
+        $contentData = $smartContent->getContentData($property);
 
         $this->assertEquals([1, 2, 3, 4, 5], $contentData);
     }
@@ -464,7 +557,11 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
             // third page page-size 3 (only two pages because of the limit-result)
             [3, 3, 8, '123-123-123', [7, 8], false],
             // fourth page page-size 3 (empty result)
-            [4, 3, 8, '123-123-123', [], false],
+            [4, 3, 8, '123-123-123', [], false, PageOutOfBoundsException::class],
+            [1, 3, 8, '123-123-123', [], false],
+            [-1, 3, 8, '123-123-123', [1, 2, 3], true, PageOutOfBoundsException::class],
+            [0, 3, 8, '123-123-123', [1, 2, 3], true, PageOutOfBoundsException::class],
+            ['99999999999999999999', 3, 8, '123-123-123', [1, 2, 3], true, PageOutOfBoundsException::class],
         ];
     }
 
@@ -477,10 +574,26 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
         $limitResult,
         $uuid,
         $expectedData,
-        $hasNextPage
+        $hasNextPage,
+        $exception = null
     ) {
+        $smartContent = new SmartContent(
+            $this->dataProviderPool,
+            $this->tagManager,
+            $this->requestStack,
+            $this->tagRequestHandler->reveal(),
+            $this->categoryRequestHandler->reveal(),
+            $this->categoryReferenceStore->reveal(),
+            $this->tagReferenceStore->reveal(),
+            'SuluContentBundle:Template:content-types/smart_content.html.twig'
+        );
+
+        if ($exception) {
+            $this->setExpectedException($exception);
+        }
+
         $property = $this->getMockForAbstractClass(
-            'Sulu\Component\Content\Compat\PropertyInterface',
+            PropertyInterface::class,
             [],
             '',
             true,
@@ -488,9 +601,7 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
             true,
             ['getValue', 'getParams']
         );
-        $structure = $this->getMockForAbstractClass(
-            'Sulu\Component\Content\Compat\StructureInterface'
-        );
+        $structure = $this->prophesize(StructureInterface::class);
 
         $this->request->expects($this->at(0))->method('get')
             ->with($this->equalTo('p'))
@@ -512,6 +623,7 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
             ],
             [
                 'provider' => new PropertyParameter('provider', 'content'),
+                'alias' => null,
                 'page_parameter' => new PropertyParameter('page_parameter', 'p'),
                 'tags_parameter' => new PropertyParameter('tags_parameter', 'tags'),
                 'categories_parameter' => new PropertyParameter('categories_parameter', 'categories'),
@@ -538,27 +650,31 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
                     'sorting' => false,
                     'limit' => true,
                     'presentAs' => true,
+                    'audienceTargeting' => false,
                 ],
                 'datasource' => null,
                 'max_per_page' => new PropertyParameter('max_per_page', $pageSize),
                 'deep_link' => new PropertyParameter('deep_link', ''),
+                'exclude_duplicates' => new PropertyParameter('exclude_duplicates', false),
             ],
-            ['webspaceKey' => null, 'locale' => null],
+            ['webspaceKey' => 'sulu_io', 'locale' => 'de'],
             $limitResult,
             $page,
             $pageSize
-        )->willReturn(new DataProviderResult($expectedData, $hasNextPage, $expectedData));
+        )->willReturn(new DataProviderResult($expectedData, $hasNextPage));
 
         $property->expects($this->exactly(1))->method('getValue')
             ->will($this->returnValue($config));
         $property->expects($this->any())->method('getParams')
             ->will($this->returnValue(['max_per_page' => new PropertyParameter('max_per_page', $pageSize)]));
         $property->expects($this->exactly(3))->method('getStructure')
-            ->will($this->returnValue($structure));
+            ->will($this->returnValue($structure->reveal()));
 
-        $structure->expects($this->any())->method('getUuid')->will($this->returnValue($uuid));
+        $structure->getUuid()->willReturn($uuid);
+        $structure->getWebspaceKey()->willReturn('sulu_io');
+        $structure->getLanguageCode()->willReturn('de');
 
-        $contentData = $this->smartContent->getContentData($property);
+        $contentData = $smartContent->getContentData($property);
         $this->assertEquals($expectedData, $contentData);
     }
 
@@ -571,10 +687,26 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
         $limitResult,
         $uuid,
         $expectedData,
-        $hasNextPage
+        $hasNextPage,
+        $exception = null
     ) {
+        $smartContent = new SmartContent(
+            $this->dataProviderPool,
+            $this->tagManager,
+            $this->requestStack,
+            $this->tagRequestHandler->reveal(),
+            $this->categoryRequestHandler->reveal(),
+            $this->categoryReferenceStore->reveal(),
+            $this->tagReferenceStore->reveal(),
+            'SuluContentBundle:Template:content-types/smart_content.html.twig'
+        );
+
+        if ($exception) {
+            $this->setExpectedException($exception);
+        }
+
         $property = $this->getMockForAbstractClass(
-            'Sulu\Component\Content\Compat\PropertyInterface',
+            PropertyInterface::class,
             [],
             '',
             true,
@@ -582,9 +714,7 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
             true,
             ['getValue', 'getParams']
         );
-        $structure = $this->getMockForAbstractClass(
-            'Sulu\Component\Content\Compat\StructureInterface'
-        );
+        $structure = $this->prophesize(StructureInterface::class);
 
         $this->request->expects($this->at(0))->method('get')
             ->with($this->equalTo('p'))
@@ -608,6 +738,7 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
             ],
             [
                 'provider' => new PropertyParameter('provider', 'content'),
+                'alias' => null,
                 'page_parameter' => new PropertyParameter('page_parameter', 'p'),
                 'tags_parameter' => new PropertyParameter('tags_parameter', 'tags'),
                 'categories_parameter' => new PropertyParameter('categories_parameter', 'categories'),
@@ -634,16 +765,18 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
                     'sorting' => false,
                     'limit' => true,
                     'presentAs' => true,
+                    'audienceTargeting' => false,
                 ],
                 'datasource' => null,
                 'max_per_page' => new PropertyParameter('max_per_page', $pageSize),
                 'deep_link' => new PropertyParameter('deep_link', null),
+                'exclude_duplicates' => new PropertyParameter('exclude_duplicates', false),
             ],
-            ['webspaceKey' => null, 'locale' => null],
+            ['webspaceKey' => 'sulu_io', 'locale' => 'de'],
             $limitResult,
-            $page,
+            $page < 1 ? 1 : ($page > PHP_INT_MAX ? PHP_INT_MAX : $page),
             $pageSize
-        )->willReturn(new DataProviderResult($expectedData, $hasNextPage, $expectedData));
+        )->willReturn(new DataProviderResult($expectedData, $hasNextPage));
 
         $property->expects($this->at(1))->method('getValue')
             ->willReturn($config);
@@ -653,11 +786,13 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
         $property->expects($this->any())->method('getParams')
             ->will($this->returnValue(['max_per_page' => new PropertyParameter('max_per_page', $pageSize)]));
         $property->expects($this->exactly(3))->method('getStructure')
-            ->will($this->returnValue($structure));
+            ->will($this->returnValue($structure->reveal()));
 
-        $structure->expects($this->any())->method('getUuid')->will($this->returnValue($uuid));
+        $structure->getUuid()->willReturn($uuid);
+        $structure->getWebspaceKey()->willReturn('sulu_io');
+        $structure->getLanguageCode()->willReturn('de');
 
-        $viewData = $this->smartContent->getViewData($property);
+        $viewData = $smartContent->getViewData($property);
         $this->assertEquals(
             array_merge(
                 [
@@ -672,7 +807,6 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
                     'page' => null,
                     'hasNextPage' => null,
                     'paginated' => false,
-                    'referencedUuids' => [],
                     'categoryRoot' => null,
                     'categoriesParameter' => 'categories',
                     'tagsParameter' => 'tags',
@@ -687,7 +821,7 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
     private function getContentDataProperty($value = ['dataSource' => '123-123-123'])
     {
         $property = $this->getMockForAbstractClass(
-            'Sulu\Component\Content\Compat\PropertyInterface',
+            PropertyInterface::class,
             [],
             '',
             true,
@@ -695,9 +829,7 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
             true,
             ['getValue', 'getParams']
         );
-        $structure = $this->getMockForAbstractClass(
-            'Sulu\Component\Content\Compat\StructureInterface'
-        );
+        $structure = $this->prophesize(StructureInterface::class);
 
         $property->expects($this->exactly(1))->method('getValue')
             ->will($this->returnValue($value));
@@ -706,21 +838,22 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
             ->will($this->returnValue([]));
 
         $property->expects($this->any())->method('getStructure')
-            ->will($this->returnValue($structure));
+            ->will($this->returnValue($structure->reveal()));
 
         $this->contentDataProvider->resolveResourceItems(
             [
-                'tags' => [],
-                'categories' => [],
-                'websiteTags' => [],
-                'websiteTagsOperator' => 'OR',
-                'websiteCategories' => [],
+                'categories' => array_key_exists('categories', $value) ? $value['categories'] : [],
+                'websiteCategories' => array_key_exists('websiteCategories', $value) ? $value['websiteCategories'] : [],
                 'websiteCategoriesOperator' => 'OR',
-                'dataSource' => '123-123-123',
-                'excluded' => ['123-123-123'],
+                'tags' => array_key_exists('tags', $value) ? $value['tags'] : [],
+                'websiteTags' => array_key_exists('websiteTags', $value) ? $value['websiteTags'] : [],
+                'websiteTagsOperator' => 'OR',
+                'dataSource' => $value['dataSource'],
+                'excluded' => [$value['dataSource']],
             ],
             [
                 'provider' => new PropertyParameter('provider', 'content'),
+                'alias' => null,
                 'page_parameter' => new PropertyParameter('page_parameter', 'p'),
                 'tags_parameter' => new PropertyParameter('tags_parameter', 'tags'),
                 'categories_parameter' => new PropertyParameter('categories_parameter', 'categories'),
@@ -747,11 +880,13 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
                     'sorting' => false,
                     'limit' => true,
                     'presentAs' => true,
+                    'audienceTargeting' => false,
                 ],
                 'datasource' => null,
                 'deep_link' => new PropertyParameter('deep_link', null),
+                'exclude_duplicates' => new PropertyParameter('exclude_duplicates', false),
             ],
-            ['webspaceKey' => null, 'locale' => null],
+            ['webspaceKey' => 'sulu_io', 'locale' => 'de'],
             null
         )->willReturn(
             new DataProviderResult(
@@ -763,13 +898,94 @@ class ContentTypeTest extends \PHPUnit_Framework_TestCase
                     ['uuid' => 5],
                     ['uuid' => 6],
                 ],
-                true,
-                [1, 2, 3, 4, 5, 6]
+                true
             )
         );
 
-        $structure->expects($this->any())->method('getUuid')->will($this->returnValue('123-123-123'));
+        $structure->getUuid()->willReturn('123-123-123');
+        $structure->getWebspaceKey()->willReturn('sulu_io');
+        $structure->getLanguageCode()->willReturn('de');
 
         return $property;
+    }
+
+    public function testGetContentDataWithActivatedAudienceTargeting()
+    {
+        $smartContent = new SmartContent(
+            $this->dataProviderPool,
+            $this->tagManager,
+            $this->requestStack,
+            $this->tagRequestHandler->reveal(),
+            $this->categoryRequestHandler->reveal(),
+            $this->categoryReferenceStore->reveal(),
+            $this->tagReferenceStore->reveal(),
+            'SuluContentBundle:Template:content-types/smart_content.html.twig',
+            $this->targetGroupStore->reveal()
+        );
+
+        $property = $this->prophesize(PropertyInterface::class);
+        $property->getParams()->willReturn([
+            'provider' => new PropertyParameter('provider', 'content'),
+        ]);
+        $property->getValue()->willReturn([
+            'audienceTargeting' => true,
+        ]);
+
+        $structure = $this->prophesize(StructureInterface::class);
+        $property->getStructure()->willReturn($structure->reveal());
+
+        $this->targetGroupStore->getTargetGroupId()->willReturn(1);
+        $this->contentDataProvider->resolveResourceItems(
+            Argument::that(function($value) {
+                return 1 === $value['targetGroupId'];
+            }),
+            Argument::cetera()
+        )->willReturn(new DataProviderResult([], false));
+
+        $property->setValue(Argument::that(function($value) {
+            return 1 === $value['targetGroupId'];
+        }))->shouldBeCalled();
+
+        $smartContent->getContentData($property->reveal());
+    }
+
+    public function testGetContentDataWithDeactivatedAudienceTargeting()
+    {
+        $smartContent = new SmartContent(
+            $this->dataProviderPool,
+            $this->tagManager,
+            $this->requestStack,
+            $this->tagRequestHandler->reveal(),
+            $this->categoryRequestHandler->reveal(),
+            $this->categoryReferenceStore->reveal(),
+            $this->tagReferenceStore->reveal(),
+            'SuluContentBundle:Template:content-types/smart_content.html.twig',
+            $this->targetGroupStore->reveal()
+        );
+
+        $property = $this->prophesize(PropertyInterface::class);
+        $property->getParams()->willReturn([
+            'provider' => new PropertyParameter('provider', 'content'),
+        ]);
+        $property->getValue()->willReturn([
+            'audienceTargeting' => false,
+        ]);
+
+        $structure = $this->prophesize(StructureInterface::class);
+        $property->getStructure()->willReturn($structure->reveal());
+
+        $this->targetGroupStore->getTargetGroupId()->shouldNotBeCalled();
+        $this->contentDataProvider->resolveResourceItems(
+            Argument::that(function($value) {
+                return !array_key_exists('targetGroupId', $value);
+            }),
+            Argument::cetera()
+        )->willReturn(new DataProviderResult([], false));
+
+        $property->setValue(Argument::that(function($value) {
+            return !array_key_exists('targetGroupId', $value);
+        }))->shouldBeCalled();
+
+        $smartContent->getContentData($property->reveal());
     }
 }

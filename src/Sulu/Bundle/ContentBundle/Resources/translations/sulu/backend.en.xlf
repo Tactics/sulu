@@ -308,7 +308,7 @@
             </trans-unit>
             <trans-unit id="b50af522ac181350142c0b4720e29a2f" resname="sulu.content.seo.keywords.note">
                 <source>sulu.content.seo.keywords.note</source>
-                <target>Please use a max. of 5 keywords, dependend from the content of the page, seperated by commas.</target>
+                <target>Please use a max. of %s keywords, dependend from the content of the page, seperated by commas.</target>
             </trans-unit>
             <trans-unit id="a50af522ac181350142c0b4720e29a2f" resname="sulu.content.seo.keywords-left">
                 <source>sulu.content.seo.keywords-left</source>
@@ -316,11 +316,11 @@
             </trans-unit>
             <trans-unit id="c50af522ac181350142c0b4720e29a2e" resname="sulu.content.seo.title.note">
                 <source>sulu.content.seo.title.note</source>
-                <target>The meta title is limited to 55 characters.</target>
+                <target>The meta title is limited to %s characters.</target>
             </trans-unit>
             <trans-unit id="c50af522ac181350142c0b4720e29a2f" resname="sulu.content.seo.descriptions.note">
                 <source>sulu.content.seo.descriptions.note</source>
-                <target>The meta description is limited to 155 characters.</target>
+                <target>The meta description is limited to %s characters.</target>
             </trans-unit>
             <trans-unit id="a945ccdbf95d2852ab6390cea24ebb6f" resname="content.contents.title">
                 <source>content.contents.title</source>
@@ -829,7 +829,7 @@
              </trans-unit>
             <trans-unit id="76" resname="sulu_content.broken-template.message">
                  <source>sulu_content.broken-template.message</source>
-                 <target>Please contact system your administrator.</target>
+                 <target>Please contact your system administrator.</target>
              </trans-unit>
             <trans-unit id="77" resname="sulu_content.broken-template.message.template-name">
                  <source>sulu_content.broken-template.message.template-name</source>
@@ -846,6 +846,14 @@
             <trans-unit id="80" resname="sulu.content.form.settings.authored">
                  <source>sulu.content.form.settings.authored</source>
                  <target>Authored Date</target>
+             </trans-unit>
+            <trans-unit id="81" resname="sulu_content.rules.page">
+                <source>sulu_content.rules.page</source>
+                <target>Page</target>
+            </trans-unit>
+            <trans-unit id="82" resname="sulu.content.form.settings.no-author">
+                 <source>sulu.content.form.settings.no-author</source>
+                 <target>No Author selected</target>
              </trans-unit>
         </body>
     </file>

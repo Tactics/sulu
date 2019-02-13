@@ -13,7 +13,12 @@
  * @class TeaserSelection
  * @constructor
  */
-define(['underscore', 'config', 'text!./item.html'], function(_, Config, item, itemForm) {
+define([
+    'underscore',
+    'config',
+    'services/suluwebsite/reference-store',
+    'text!./item.html'
+], function(_, Config, referenceStore, item) {
 
     'use strict';
 
@@ -39,7 +44,6 @@ define(['underscore', 'config', 'text!./item.html'], function(_, Config, item, i
             templates: {
                 url: '/admin/api/teasers?ids=<%= ids.join(",") %>&locale=<%= locale %>',
                 item: item,
-                itemForm: itemForm,
                 presentAsButton: '<span class="fa-eye present-as icon right border"><span class="selected-text"></span><span class="dropdown-toggle"></span></span>'
             },
             translations: {
@@ -49,6 +53,40 @@ define(['underscore', 'config', 'text!./item.html'], function(_, Config, item, i
                 apply: 'sulu-content.teaser.apply',
                 cancel: 'sulu-content.teaser.cancel'
             }
+        },
+
+        /**
+         * namespace for events
+         * @type {string}
+         */
+        eventNamespace = 'sulu_content.teaser-selection.',
+
+        /**
+         * Raised when OK button of slide was clicked.
+         *
+         * @event sulu_content.teaser-selection.<instance-name>.ok-button.clicked
+         */
+        SLIDE_OK_BUTTON = function() {
+            return createEventName.call(this, 'ok-button.clicked');
+        },
+
+        /**
+         * Raised when OK button of slide was clicked.
+         *
+         * @event sulu_content.teaser-selection.<instance-name>.cancel-button.clicked
+         */
+        SLIDE_CANCEL_BUTTON = function() {
+            return createEventName.call(this, 'cancel-button.clicked');
+        },
+
+        /**
+         * Returns normalized event names
+         *
+         * @param {string} postFix
+         * @returns {string}
+         */
+        createEventName = function(postFix) {
+            return eventNamespace + (this.options.instanceName ? this.options.instanceName + '.' : '') + postFix;
         },
 
         renderDropdown = function() {
@@ -113,7 +151,22 @@ define(['underscore', 'config', 'text!./item.html'], function(_, Config, item, i
         addByType = function(type) {
             var $container = $('<div class="teaser-selection"/>'),
                 $componentContainer = $('<div/>'),
-                data = this.getData().items || [];
+                data = this.getData().items || [],
+                additionalSlides = _.map(type.additionalSlides, function(slide) {
+                    slide.okCallback = function() {
+                        this.sandbox.emit(SLIDE_OK_BUTTON.call(this), slide);
+
+                        return false;
+                    }.bind(this);
+
+                    slide.cancelCallback = function() {
+                        this.sandbox.emit(SLIDE_CANCEL_BUTTON.call(this), slide);
+
+                        return false;
+                    }.bind(this);
+
+                    return slide;
+                }.bind(this));
 
             this.$el.append($container);
 
@@ -140,7 +193,7 @@ define(['underscore', 'config', 'text!./item.html'], function(_, Config, item, i
                                     this.sandbox.stop($componentContainer);
                                 }.bind(this)
                             }
-                        ]
+                        ].concat(additionalSlides)
                     }
                 }
             ]);
@@ -356,6 +409,8 @@ define(['underscore', 'config', 'text!./item.html'], function(_, Config, item, i
         initialize: function() {
             this.$el.addClass('teaser-selection');
 
+            this.prefillReferenceStore();
+
             this.render();
             renderDropdown.call(this);
 
@@ -412,14 +467,7 @@ define(['underscore', 'config', 'text!./item.html'], function(_, Config, item, i
         sortHandler: function(ids) {
             var data = this.getData();
 
-            data.items = _.map(ids, function(id) {
-                var parts = id.split(';');
-
-                return {
-                    type: parts[0],
-                    id: parts[1]
-                }
-            });
+            data.items = _.map(ids, this.getItem.bind(this));
 
             this.setData(data, false);
         },
@@ -492,6 +540,17 @@ define(['underscore', 'config', 'text!./item.html'], function(_, Config, item, i
             this.setData(data, false);
 
             return this.getItem(id);
+        },
+
+        prefillReferenceStore: function() {
+            var data = this.getData(),
+                items = data.items || [];
+
+            for (var key in items) {
+                if (items.hasOwnProperty(key)) {
+                    referenceStore.add(items[key].type, items[key].id);
+                }
+            }
         }
     };
 });
