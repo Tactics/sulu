@@ -1,15 +1,15 @@
 # Upgrade
 
-## dev-develop
+## dev-release/1.5
 
-### Removed symfony/security-acl dependency
+### User API performance improvement
 
-The following deprecated classes was removed:
+The API at `/admin/api/users/{id}` does not contain the `permissions` field of the roles anymore, because it caused
+problems if many webspaces are configured.
 
-* `Sulu\Component\Security\Authorization\AccessControl\PermissionMap`
-* `Sulu\Component\Security\Authorization\AccessControl\SymfonyAccessControlManager`
+## 1.5.15
 
-Therefor the dependency `symfony/security-acl` was useless and removed.
+Added method `hasType` to `Sulu\Component\Content\Compat\Block\BlockPropertyInterface`.
 
 ## 1.5.0-RC1
 
@@ -57,6 +57,8 @@ start values for `author` and `authored`.
 ```
 app/console phpcr:migrations:migrate
 ```
+
+If the migration failed with `getContact() on a none object` upgrade to at least 1.5.4 and run the migration command again.
 
 ### Twig 2
 

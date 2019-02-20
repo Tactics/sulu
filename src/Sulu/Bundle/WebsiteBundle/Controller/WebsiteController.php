@@ -32,8 +32,6 @@ abstract class WebsiteController extends Controller
      * @param bool $partial Defines if only the content block of the template should be rendered
      *
      * @return Response
-     *
-     * @deprecated will be remove with 2.0
      */
     protected function renderStructure(
         StructureInterface $structure,
@@ -102,6 +100,7 @@ abstract class WebsiteController extends Controller
 
         $level = ob_get_level();
         ob_start();
+
         try {
             $rendered = $template->renderBlock($block, $attributes);
             ob_end_clean();

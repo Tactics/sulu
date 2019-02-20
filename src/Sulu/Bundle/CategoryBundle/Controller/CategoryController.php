@@ -107,7 +107,7 @@ class CategoryController extends RestController implements ClassResourceInterfac
     {
         $locale = $this->getRequestParameter($request, 'locale', true);
 
-        if ($request->get('flat') == 'true') {
+        if ('true' == $request->get('flat')) {
             // check if parent exists
             $this->getCategoryManager()->findById($parentId);
             $list = $this->getListRepresentation($request, $locale, $parentId);
@@ -135,7 +135,7 @@ class CategoryController extends RestController implements ClassResourceInterfac
         $locale = $this->getRequestParameter($request, 'locale', true);
         $rootKey = $request->get('rootKey');
 
-        if ($request->get('flat') == 'true') {
+        if ('true' == $request->get('flat')) {
             $rootId = ($rootKey) ? $this->getCategoryManager()->findByKey($rootKey)->getId() : null;
             $expandIds = array_filter(explode(',', $request->get('expandIds')));
             $list = $this->getListRepresentation($request, $locale, $rootId, $expandIds);
@@ -283,13 +283,16 @@ class CategoryController extends RestController implements ClassResourceInterfac
             );
         }
 
-        // expand collected parents if search is not set, else search all categories
         if (!$request->get('search')) {
+            // expand collected parents if search is not set
             if (count($parentExpressions) >= 2) {
                 $listBuilder->addExpression($listBuilder->createOrExpression($parentExpressions));
             } elseif (count($parentExpressions) >= 1) {
                 $listBuilder->addExpression($parentExpressions[0]);
             }
+        } elseif ($request->get('search') && $parentId && !$expandIds) {
+            // filter for parentId when search is active and no expandedIds are set
+            $listBuilder->addExpression($parentExpressions[0]);
         }
 
         $results = $listBuilder->execute();

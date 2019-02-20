@@ -219,6 +219,14 @@ class Media extends ApiWrapper
     }
 
     /**
+     * @return string|null
+     */
+    public function getExtension()
+    {
+        return $this->getFileVersion()->getExtension();
+    }
+
+    /**
      * @param string $title
      *
      * @return $this
@@ -845,13 +853,13 @@ class Media extends ApiWrapper
      */
     public function getFileVersion()
     {
-        if ($this->fileVersion !== null) {
+        if (null !== $this->fileVersion) {
             return $this->fileVersion;
         }
 
         /** @var File $file */
         foreach ($this->entity->getFiles() as $file) {
-            if ($this->version !== null) {
+            if (null !== $this->version) {
                 $version = $this->version;
             } else {
                 $version = $file->getVersion();
@@ -866,6 +874,7 @@ class Media extends ApiWrapper
             }
             break; // currently only one file per media exists
         }
+
         throw new FileVersionNotFoundException($this->entity->getId(), $this->version);
     }
 
@@ -876,7 +885,7 @@ class Media extends ApiWrapper
      */
     public function getFile()
     {
-        if ($this->file !== null) {
+        if (null !== $this->file) {
             return $this->file;
         }
 

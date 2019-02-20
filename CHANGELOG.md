@@ -1,13 +1,115 @@
 CHANGELOG for Sulu
 ==================
 
-* dev-master
+* release/1.5
+    * ENHANCEMENT #4367 [WebsiteBundle]         Remove false deprecation of WebsiteController::renderStructure
+    * BUGFIX      #4376 [SecurityBundle]        Exclude role permissions in user API to improve performance
+
+* 1.5.20 (2019-01-09)
+    * ENHANCEMENT #4319 [MediaBundle]           Added possibility to have a image format configuration file without formats
+
+* 1.5.19 (2018-12-03)
+    * HOTFIX      #4304 [DocumentManager]       Fix performance issue by removing redundant properties on Metadata
+    * HOTFIX      #4263 [Content]               Fix param default value
+    * HOTFIX      #4240 [All]                   Fix travis timeout for PHP 5.5
+    * HOTFIX      #4207 [WebsiteBundle]         Redirect pages with trailing slashes were missing query paraamters
+    * HOTFIX      #4241 [SecurityBundle]        Set default locale for admin user to "en"
+    * HOTFIX      #4112 [SecurityBundle]        Added exception messages to user provider for enabled and locked
+
+* 1.5.18 (2018-10-05)
+    * HOTFIX      #4092 [TestBundle]            Fixed firewall in test website kernel for community bundle
+
+* 1.5.17 (2018-07-18)
+    * HOTFIX      #4063 [ContentComponent]      Fixed copy language function, which didn't copy the extension data
+    * HOTFIX      #4056 [MediaBundle]           Added security-check for collection permission to media-controller
+    * HOTFIX      #5060 [MediaBundle]           Added escaping of media edit overlay title
+    * HOTFIX      #4067 [SmartContent]          Avoid returning the same id multiple times in filter query of smart content
+    * HOTFIX      #4058 [ContactBundle]         Added escaping of name in contact-list
+    * HOTFIX      #4058 [ContactBundle]         Added escaping for address and bank-accounts
+    * HOTFIX      #4058 [MediaBundle]           Added escaping of name in media-list
+    * HOTFIX      #4057 [SecurityBundle]        Removed password-hash from user-api
+
+* 1.5.16 (2018-06-29)
+    * ENHANCEMENT #4028 [MediaBundle]           Log errors in image generation
+    * ENHANCEMENT #3850 [SecurityBundle]        Allow user to be null for security config
+    * ENHANCEMENT #3850 [MediaBundle]           Allow user to be null for security expression in service build
+    * BUGFIX      #4018 [SnippetBundle]         Fix conflict when saving snippet in new language
+    * BUGFiX      #3995 [TestBundle]            Fix tests for latest Symfony version
+
+* 1.5.15 (2018-05-24)
+    * HOTFIX      #3988 [ContentBundle]         Date content type: Reading: Check if value is instance of DateTime
+    * HOTFIX      #3988 [BlockComponent]        Read: Ignore unknown types
+    * BUGFIX      #3967 [All]                   Fixed loading of minified js files for production
+    * HOTFIX      #3963 [ContentBundle]         Don't reload data when changing template in add form
+    * HOTFIX      #3953 [RouteBundle]           Fix route options with dash
+
+* 1.5.14 (2018-05-03)
+    * HOTFIX      #3946 [ContentBundle]         Single internal link: Clear selection when target doesn't exists
+    * HOTFIX      #3941 [WebsiteBundle]         Fix hideInSitemap flag for sitemap twig extension
+    * BUGFIX      #3926 [WebsiteBundle]         Fix profiler for none sulu routes
+
+* 1.5.13 (2018-04-23)
+    * BUGFIX      #3915 [ContactBundle]         Fix typehint in api ContactLocale constructor
+    * BUGFIX      #3918 [RestComponent]         CSV Export: Fixed serialization of boolean
+    * ENHANCEMENT #3876 [ContentBundle]         Reload data when changing template  
+
+* 1.5.12 (2018-03-19)
+    * ENHANCEMENT #3830 [All]                   Avoid duplicated run of composer update for travis
+    * BUGFIX      #3826 [ContentBundle]         Fix enabling of save button when toggler is changed
+    * HOTFIX      #3819 [MediaBundle]           Fix forgotten context binding for resetPreviewUrl method
+    * FEATURE     #3816 [All]                   Validate if grunt build was run for all bundles with circleci
+    * BUGFIX      #3806 [All]                   Fix compatibility on lowest and fix appveyor
+    * BUGFIX      #3351 [ContentBundle]         Fix spacing between rows and section in content template generation
+
+* 1.5.11 (2018-02-27)
+    * HOTFIX      #3789 [MediaBundle]           Check if current user is sulu user to avoid errors
+    * BUGFIX      #3639 [ContentBundle]         Fix structure internal flag and add webspace validate command
+    * ENHANCEMENT #3764 [Component]             Allow dynamic order of elements in webspace xml
+    * HOTFIX      #3752 [ContentBundle]         Overwrite 'doctrine:phpcr:workspace:import' set default to throw
+    * ENHANCEMENT #3775 [Component]             Use is iterable instead of custom is_array twig function in webspace dumper
+
+* 1.5.10 (2018-02-06)
+    * HOTFIX      #3739 [ContentBundle]         Added locale to content-teaser query
+    * ENHANCEMENT #3735 [DocumentManager]       Set proper default locale for document-manager
+    * ENHANCEMENT #3736 [WebsiteBundle]         Added exception when default_host is needed for sitemap generation
+    * HOTFIX      #3741 [ContentBundle]         Cleand-up xliff import/export component
+    * HOTFIX      #3730 [ContactBundle]         Fixed class parameter to load field-descriptor
+    * HOTFIX      #3720 [MediaBundle]           Added extension-guesser to fix wrong extensions on download
+
+* 1.5.9 (2018-01-18)
+    * HOTFIX      #3709 [CategoryBundle]        Category API: Fix bug when searching with rootKey parameter
+    * BUGFIX      #3693 [MediaBundle]           Fix retina flag in XmlFormatLoader11 & add tests for retina flag
+
+* 1.5.8 (2017-12-13)
+    * HOTFIX      #3690 [ContentBundle]         Fix saving of not yet started text editor
+    * HOTFIX      #3684 [SecurityBundle]        Fixed conflict between admin and website session cookie
+    * HOTFIX      #3686 [ContentBundle]         Validate if ckeditor instances are not in source mode
+    * HOTFIX      #3585 [PersistanceBundle]     Fixed exception of blame for none sulu users
+    * HOTFIX      #3676 [PreviewBundle]         Fixed preview update for property names with underscore
+
+* 1.5.7 (2017-10-12)
+    * HOTFIX      #3551 [SecurityBundle]        Fixed permissions for user with no role
+    * HOTFIX      #3553 [SecurityBundle]        Added system check for password reset
+
+* 1.5.6 (2017-09-14)
+    * HOTFIX      #3511 [MediaBundle]           Fixed disappearing of selected medias
+
+* 1.5.5 (2017-06-28)
+    * HOTFIX      #3404 [DocumentManagerBundle] Remove exception for non-Sulu user
+
+* 1.5.4 (2017-05-31)
+    * HOTFIX      #3356 [AdminBundle]           Updated husky to fix issue with ckeditor plugins
+    * HOTFIX      #3314 [ContentBundle]         Fixed author migration script for removed users.
+    * BUGFIX      #3355 [ContentBundle]         Fixed sort-handler of teaser-selection
+
+* 1.5.3 (2017-04-06)
+    * HOTFIX      #3279 [CategoryBundle]        Add missing return statement.
+    * HOTFIX      #3277 [PreviewBundle]         Added fake portal for preview when nothing matches
+    * HOTFIX      #3281 [ContentBundle]         Fixed index pages with redirect-behavior
+    * HOTFIX      #3297 [WebsiteBundle]         Fixed allDomains option for Analytics
+    * HOTFIX      #3295 [WebsiteBundle]         Removed analytics code from preview
+    * HOTFIX      #3289 [ContentBundle]         Fixed smart-content to use it without webspace
     * HOTFIX      #3282 [ContentBundle]         Fixed teaser-selection locale
-* dev-develop
-    * ENHANCEMENT #3266 [ContentBundle]         Added locale parameter to teaser-selection-list
-    * FEATURE     #3278 [Util]                  Changed way to determine `sulu.version` to composer.lock
-    * FEATURE     #3278 [Util]                  Introduced new parameter `app.version` read from composer.json
-    * ENHANCEMENT #3154 [All]                   Upgrade symfony to ^3.0
 
 * 1.5.2 (2017-03-22)
     * HOTFIX      #3265 [ContentBundle]         Fixed internal-link selection for pages
@@ -97,6 +199,11 @@ CHANGELOG for Sulu
     * BUGFIX      #3031 [AdminBundle]         Fixed defaultDisplayOption in media selectio content type
     * BUGFIX      #3075 [ContentComponent]    Fixed missing referenced UUIDs for contentTypes nested in a block
     * ENHANCEMENT #1686 [SnippetBundle]       Added XLIFF-Import/Export for Snippet-Documents.
+
+* 1.4.12 (2017-04-06)
+    * HOTFIX      #3279 [CategoryBundle]        Add missing return statement.
+    * HOTFIX      #3277 [PreviewBundle]         Added fake portal for preview when nothing matches
+    * HOTFIX      #3281 [ContentBundle]         Fixed index pages with redirect-behavior
 
 * 1.4.11 (2017-03-22)
     * HOTFIX      #3270 [Webspace]              Removed localization usage check in webspace's xml files

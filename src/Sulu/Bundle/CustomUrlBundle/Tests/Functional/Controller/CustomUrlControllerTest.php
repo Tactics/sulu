@@ -121,14 +121,14 @@ class CustomUrlControllerTest extends SuluTestCase
 
         $this->assertHttpStatusCode($statusCode, $response);
 
-        if ($statusCode !== 200) {
+        if (200 !== $statusCode) {
             $this->assertEquals($restErrorCode, $responseData['code']);
 
             return;
         }
 
         foreach ($data as $key => $value) {
-            if ($key === 'targetDocument') {
+            if ('targetDocument' === $key) {
                 $this->assertEquals($value['uuid'], $responseData[$key]['id'], $key);
             } else {
                 $this->assertEquals($value, $responseData[$key], $key);
@@ -520,14 +520,14 @@ class CustomUrlControllerTest extends SuluTestCase
 
         $this->assertHttpStatusCode($statusCode, $response);
 
-        if ($statusCode !== 200) {
+        if (200 !== $statusCode) {
             $this->assertEquals($restErrorCode, $responseData['code']);
 
             return;
         }
 
         foreach ($data as $key => $value) {
-            if ($key === 'targetDocument') {
+            if ('targetDocument' === $key) {
                 $this->assertEquals($value['uuid'], $responseData[$key]['id'], $key);
             } else {
                 $this->assertEquals($value, $responseData[$key], $key);
@@ -602,7 +602,7 @@ class CustomUrlControllerTest extends SuluTestCase
         $this->assertHttpStatusCode(200, $response);
 
         foreach ($data as $key => $value) {
-            if ($key === 'targetDocument') {
+            if ('targetDocument' === $key) {
                 $this->assertEquals($value['uuid'], $responseData[$key]['id'], $key);
             } else {
                 $this->assertEquals($value, $responseData[$key], $key);
@@ -711,8 +711,8 @@ class CustomUrlControllerTest extends SuluTestCase
             $this->assertArrayHasKey('creator', $responseData);
             $this->assertArrayHasKey('changer', $responseData);
 
-            $this->assertEquals($requestTime, new \DateTime($responseData['created']), '', 2);
-            $this->assertEquals($requestTime, new \DateTime($responseData['changed']), '', 2);
+            $this->assertLessThanOrEqual($requestTime, new \DateTime($responseData['created']));
+            $this->assertLessThanOrEqual($requestTime, new \DateTime($responseData['changed']));
             if (array_key_exists('targetDocument', $data)) {
                 $this->assertEquals('Homepage', $responseData['targetTitle']);
             } else {

@@ -111,8 +111,8 @@ class ContentDataProvider implements DataProviderInterface
             ->enableDatasource(
                 'content-datasource@sulucontent',
                 [
-                    'rootUrl' => '/admin/api/nodes?webspace={webspace}&language={locale}&fields=title,order,published&webspace-nodes=single',
-                    'selectedUrl' => '/admin/api/nodes/{datasource}?tree=true&webspace={webspace}&language={locale}&fields=title,order,published&webspace-nodes=single',
+                    'rootUrl' => '/admin/api/nodes?language={locale}&fields=title,order,published&webspace-nodes=all',
+                    'selectedUrl' => '/admin/api/nodes/{datasource}?tree=true&language={locale}&fields=title,order,published&webspace-nodes=all',
                     'resultKey' => 'nodes',
                 ]
             )
@@ -167,7 +167,7 @@ class ContentDataProvider implements DataProviderInterface
             0
         );
 
-        if (count($result) === 0) {
+        if (0 === count($result)) {
             return;
         }
 
@@ -254,8 +254,8 @@ class ContentDataProvider implements DataProviderInterface
         $emptyFilterResult = [[], false];
 
         if (!array_key_exists('dataSource', $filters)
-            || $filters['dataSource'] === ''
-            || ($limit !== null && $limit < 1)
+            || '' === $filters['dataSource']
+            || (null !== $limit && $limit < 1)
         ) {
             return $emptyFilterResult;
         }
@@ -279,7 +279,7 @@ class ContentDataProvider implements DataProviderInterface
         );
 
         $hasNextPage = false;
-        if ($pageSize !== null) {
+        if (null !== $pageSize) {
             $result = $this->loadPaginated($options, $limit, $page, $pageSize);
             $hasNextPage = (count($result) > $pageSize);
             $items = array_splice($result, 0, $pageSize);
@@ -306,7 +306,7 @@ class ContentDataProvider implements DataProviderInterface
         $offset = ($page - 1) * $pageSize;
 
         $position = $pageSize * $page;
-        if ($limit !== null && $position >= $limit) {
+        if (null !== $limit && $position >= $limit) {
             $pageSize = $limit - $offset;
             $loadLimit = $pageSize;
         } else {

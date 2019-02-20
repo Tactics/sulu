@@ -41,16 +41,30 @@ class AppendAnalyticsListener
      */
     private $environment;
 
+    /**
+     * @var bool
+     */
+    private $preview;
+
+    /**
+     * @param EngineInterface $engine
+     * @param RequestAnalyzerInterface $requestAnalyzer
+     * @param AnalyticsRepository $analyticsRepository
+     * @param $environment
+     * @param bool $preview
+     */
     public function __construct(
         EngineInterface $engine,
         RequestAnalyzerInterface $requestAnalyzer,
         AnalyticsRepository $analyticsRepository,
-        $environment
+        $environment,
+        $preview = false
     ) {
         $this->engine = $engine;
         $this->requestAnalyzer = $requestAnalyzer;
         $this->analyticsRepository = $analyticsRepository;
         $this->environment = $environment;
+        $this->preview = $preview;
     }
 
     /**
@@ -60,8 +74,9 @@ class AppendAnalyticsListener
      */
     public function onResponse(FilterResponseEvent $event)
     {
-        if (0 !== strpos($event->getResponse()->headers->get('Content-Type'), 'text/html')
-            || $this->requestAnalyzer->getPortalInformation() === null
+        if ($this->preview
+            || 0 !== strpos($event->getResponse()->headers->get('Content-Type'), 'text/html')
+            || null === $this->requestAnalyzer->getPortalInformation()
         ) {
             return;
         }

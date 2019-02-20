@@ -11,6 +11,7 @@
 
 namespace Sulu\Bundle\MediaBundle\DependencyInjection;
 
+use Sulu\Bundle\MediaBundle\Entity\Collection;
 use Sulu\Bundle\MediaBundle\Media\Exception\FileVersionNotFoundException;
 use Sulu\Bundle\MediaBundle\Media\Exception\FormatNotFoundException;
 use Sulu\Bundle\MediaBundle\Media\Exception\FormatOptionsMissingParameterException;
@@ -85,6 +86,9 @@ class SuluMediaExtension extends Extension implements PrependExtensionInterface
     {
         $configuration = new Configuration();
         $config = $this->processConfiguration($configuration, $configs);
+
+        // collection-class
+        $container->setParameter('sulu.model.collection.class', Collection::class);
 
         // image-formats
         $container->setParameter('sulu_media.image_format_files', $config['image_format_files']);
@@ -167,7 +171,7 @@ class SuluMediaExtension extends Extension implements PrependExtensionInterface
         $loader = new Loader\XmlFileLoader($container, new FileLocator(__DIR__ . '/../Resources/config'));
         $loader->load('services.xml');
 
-        if ($config['adapter'] === 'auto') {
+        if ('auto' === $config['adapter']) {
             $container->setAlias(
                 'sulu_media.adapter',
                 'sulu_media.adapter.' . (class_exists('Imagick') ? 'imagick' : 'gd')

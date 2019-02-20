@@ -25,6 +25,7 @@ class SnippetControllerTest extends SuluTestCase
      * @var Client
      */
     protected $client;
+
     /**
      * @var SnippetDocument
      */
@@ -90,6 +91,13 @@ class SnippetControllerTest extends SuluTestCase
                 [
                     'title' => 'The Grand Budapest',
                     'description' => 'Hello World',
+                ],
+            ],
+            [
+                'nl',
+                [
+                    'title' => '',
+                    'description' => '',
                 ],
             ],
         ];

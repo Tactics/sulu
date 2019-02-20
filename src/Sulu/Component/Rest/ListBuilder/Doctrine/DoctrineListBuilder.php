@@ -29,6 +29,7 @@ use Sulu\Component\Rest\ListBuilder\Expression\Doctrine\DoctrineOrExpression;
 use Sulu\Component\Rest\ListBuilder\Expression\Doctrine\DoctrineWhereExpression;
 use Sulu\Component\Rest\ListBuilder\Expression\Exception\InvalidExpressionArgumentException;
 use Sulu\Component\Rest\ListBuilder\FieldDescriptorInterface;
+use Sulu\Component\Security\Authentication\UserInterface;
 use Sulu\Component\Security\Authorization\AccessControl\SecuredEntityRepositoryTrait;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
@@ -98,6 +99,18 @@ class DoctrineListBuilder extends AbstractListBuilder
      */
     private $idField;
 
+    /**
+     * @var string
+     */
+    private $securedEntityName;
+
+    /**
+     * Array of unique field descriptors needed for secure-check.
+     *
+     * @var array
+     */
+    private $permissionCheckFields = [];
+
     public function __construct(
         EntityManager $em,
         $entityName,
@@ -114,6 +127,26 @@ class DoctrineListBuilder extends AbstractListBuilder
             $this->entityName,
             'public.id'
         );
+
+        $this->securedEntityName = $entityName;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setPermissionCheck(UserInterface $user, $permission, $securedEntityName = null)
+    {
+        parent::setPermissionCheck($user, $permission);
+
+        $this->securedEntityName = $securedEntityName ?: $this->entityName;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function addPermissionCheckField(DoctrineFieldDescriptor $fieldDescriptor)
+    {
+        $this->permissionCheckFields[$fieldDescriptor->getEntityName()] = $fieldDescriptor;
     }
 
     /**
@@ -127,7 +160,7 @@ class DoctrineListBuilder extends AbstractListBuilder
         $numResults = count($result);
         if ($numResults > 1) {
             return $numResults;
-        } elseif ($numResults == 1) {
+        } elseif (1 == $numResults) {
             $result = array_values($result[0]);
 
             return (int) $result[0];
@@ -190,7 +223,7 @@ class DoctrineListBuilder extends AbstractListBuilder
         $select = $this->getSelectAs($this->idField);
 
         $subQueryBuilder = $this->createSubQueryBuilder($select);
-        if ($this->limit != null) {
+        if (null != $this->limit) {
             $subQueryBuilder->setMaxResults($this->limit)->setFirstResult($this->limit * ($this->page - 1));
         }
 
@@ -226,7 +259,7 @@ class DoctrineListBuilder extends AbstractListBuilder
     protected function assignSortFields($queryBuilder)
     {
         // if no sort has been assigned add order by id ASC as default
-        if (count($this->sortFields) === 0) {
+        if (0 === count($this->sortFields)) {
             $queryBuilder->addOrderBy($this->idField->getSelect(), 'ASC');
         }
 
@@ -299,7 +332,7 @@ class DoctrineListBuilder extends AbstractListBuilder
             $this->getUniqueExpressionFieldDescriptors($this->expressions)
         );
 
-        if ($onlyReturnFilterFields !== true) {
+        if (true !== $onlyReturnFilterFields) {
             $fields = array_merge($fields, $this->selectFields);
         }
 
@@ -336,8 +369,8 @@ class DoctrineListBuilder extends AbstractListBuilder
                 $queryBuilder,
                 $this->user,
                 $this->permissions[$this->permission],
-                $this->entityName,
-                $this->entityName
+                $this->securedEntityName,
+                $this->securedEntityName
             );
         }
 
@@ -359,20 +392,26 @@ class DoctrineListBuilder extends AbstractListBuilder
         foreach ($this->getAllFields() as $key => $field) {
             // if field is in any conditional clause -> add join
             if (($field instanceof DoctrineFieldDescriptor || $field instanceof DoctrineJoinDescriptor) &&
-                array_search($field->getEntityName(), $necessaryEntityNames) !== false
+                false !== array_search($field->getEntityName(), $necessaryEntityNames)
                 && $field->getEntityName() !== $this->entityName
             ) {
                 $addJoins = array_merge($addJoins, $field->getJoins());
             } else {
                 // include inner joins
                 foreach ($field->getJoins() as $entityName => $join) {
-                    if ($join->getJoinMethod() !== DoctrineJoinDescriptor::JOIN_METHOD_INNER &&
-                        array_search($entityName, $necessaryEntityNames) === false
+                    if (DoctrineJoinDescriptor::JOIN_METHOD_INNER !== $join->getJoinMethod() &&
+                        false === array_search($entityName, $necessaryEntityNames)
                     ) {
                         break;
                     }
                     $addJoins = array_merge($addJoins, [$entityName => $join]);
                 }
+            }
+        }
+
+        if ($this->user && $this->permission && array_key_exists($this->permission, $this->permissions)) {
+            foreach ($this->permissionCheckFields as $permissionCheckField) {
+                $addJoins = array_merge($addJoins, $permissionCheckField->getJoins());
             }
         }
 
@@ -438,7 +477,7 @@ class DoctrineListBuilder extends AbstractListBuilder
 
         $this->assignGroupBy($this->queryBuilder);
 
-        if ($this->search !== null) {
+        if (null !== $this->search) {
             $searchParts = [];
             foreach ($this->searchFields as $searchField) {
                 $searchParts[] = $searchField->getSearch();
@@ -459,7 +498,7 @@ class DoctrineListBuilder extends AbstractListBuilder
      */
     protected function assignJoins(QueryBuilder $queryBuilder, array $joins = null)
     {
-        if ($joins === null) {
+        if (null === $joins) {
             $joins = $this->getJoins();
         }
 
@@ -550,7 +589,7 @@ class DoctrineListBuilder extends AbstractListBuilder
      */
     protected function getUniqueExpressionFieldDescriptors(array $expressions)
     {
-        if (count($this->expressionFields) === 0) {
+        if (0 === count($this->expressionFields)) {
             $descriptors = [];
             $uniqueNames = array_unique($this->getAllFieldNames($expressions));
             foreach ($uniqueNames as $uniqueName) {
