@@ -3,7 +3,7 @@
 /*
  * This file is part of Sulu.
  *
- * (c) MASSIVE ART WebServices GmbH
+ * (c) Sulu GmbH
  *
  * This source file is subject to the MIT license that is bundled
  * with this source code in the file LICENSE.
@@ -49,9 +49,9 @@ class PathCleanupTest extends \PHPUnit_Framework_TestCase
 
     public function testCleanup()
     {
-        $clean = $this->cleaner->cleanup('-/aSDf     asdf/äöü-', 'de');
+        $clean = $this->cleaner->cleanup('-/aSDf     asdf/äöü-/hello: world\'s', 'de');
 
-        $this->assertEquals('/asdf-asdf/aeoeue', $clean);
+        $this->assertEquals('/asdf-asdf/aeoeue/hello-worlds', $clean);
     }
 
     public function testValidate()

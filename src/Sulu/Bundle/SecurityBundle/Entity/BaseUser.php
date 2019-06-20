@@ -3,7 +3,7 @@
 /*
  * This file is part of Sulu.
  *
- * (c) MASSIVE ART WebServices GmbH
+ * (c) Sulu GmbH
  *
  * This source file is subject to the MIT license that is bundled
  * with this source code in the file LICENSE.
@@ -531,6 +531,10 @@ abstract class BaseUser extends ApiEntity implements UserInterface, Serializable
         if (!$user instanceof self) {
             return false;
         }
+<<<<<<< HEAD
+=======
+
+>>>>>>> adcfb1b5c4aa3d40a8adde5e2c2579d1aa8fc601
         return $this->id === $user->getId()
             && $this->password === $user->getPassword()
             && $this->salt === $user->getSalt()

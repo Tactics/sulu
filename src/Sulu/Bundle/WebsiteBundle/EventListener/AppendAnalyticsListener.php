@@ -3,7 +3,7 @@
 /*
  * This file is part of Sulu.
  *
- * (c) MASSIVE ART WebServices GmbH
+ * (c) Sulu GmbH
  *
  * This source file is subject to the MIT license that is bundled
  * with this source code in the file LICENSE.
@@ -94,8 +94,14 @@ class AppendAnalyticsListener
      */
     public function onResponse(FilterResponseEvent $event)
     {
-        if ($this->preview
-            || 0 !== strpos($event->getResponse()->headers->get('Content-Type'), 'text/html')
+        if ($this->preview) {
+            return;
+        }
+
+        $response = $event->getResponse();
+
+        if (0 !== strpos($response->headers->get('Content-Type'), 'text/html')
+            || !$response->getContent()
             || null === $this->requestAnalyzer->getPortalInformation()
         ) {
             return;

@@ -3,7 +3,7 @@
 /*
  * This file is part of Sulu.
  *
- * (c) MASSIVE ART WebServices GmbH
+ * (c) Sulu GmbH
  *
  * This source file is subject to the MIT license that is bundled
  * with this source code in the file LICENSE.
@@ -23,6 +23,10 @@ class RedirectEnhancerTest extends \PHPUnit_Framework_TestCase
     public function testEnhance()
     {
         $request = $this->prophesize(Request::class);
+        $request->getHost()->willReturn('sulu.io');
+        $request->getScheme()->willReturn('http');
+        $request->getQueryString()->willReturn(null);
+
         $webspace = $this->prophesize(Webspace::class);
         $webspace->getKey()->willReturn('sulu_io');
 
@@ -39,7 +43,9 @@ class RedirectEnhancerTest extends \PHPUnit_Framework_TestCase
             '/test',
             'prod',
             'de',
-            'sulu_io'
+            'sulu_io',
+            'sulu.io',
+            'http'
         )->willReturn('sulu.io/test');
 
         $enhancer = new RedirectEnhancer($webspaceManager->reveal());
@@ -64,6 +70,9 @@ class RedirectEnhancerTest extends \PHPUnit_Framework_TestCase
     public function testEnhanceWithQueryString()
     {
         $request = $this->prophesize(Request::class);
+        $request->getHost()->willReturn('sulu.io');
+        $request->getScheme()->willReturn('http');
+
         $webspace = $this->prophesize(Webspace::class);
         $webspace->getKey()->willReturn('sulu_io');
 
@@ -80,7 +89,9 @@ class RedirectEnhancerTest extends \PHPUnit_Framework_TestCase
             '/test',
             'prod',
             'de',
-            'sulu_io'
+            'sulu_io',
+            'sulu.io',
+            'http'
         )->willReturn('sulu.io/test');
 
         $request->getQueryString()->willReturn('param=1');

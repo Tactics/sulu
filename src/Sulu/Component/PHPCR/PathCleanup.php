@@ -3,7 +3,7 @@
 /*
  * This file is part of Sulu.
  *
- * (c) MASSIVE ART WebServices GmbH
+ * (c) Sulu GmbH
  *
  * This source file is subject to the MIT license that is bundled
  * with this source code in the file LICENSE.
@@ -74,10 +74,13 @@ class PathCleanup implements PathCleanupInterface
 
         // Inspired by ZOOLU
         // delete problematic characters
-        $clean = str_replace('%2F', '/', urlencode(preg_replace('/([^A-za-z0-9 -_\/])/', '', $clean)));
+        $clean = str_replace('%2F', '/', urlencode(preg_replace('/([^A-za-z0-9\s\-_\/])/', '', $clean)));
 
         // replace multiple dash with one
         $clean = preg_replace('/([-]+)/', '-', $clean);
+
+        // remove dash before slash
+        $clean = preg_replace('/[-]+\//', '/', $clean);
 
         // remove dash after slash
         $clean = preg_replace('/\/[-]+/', '/', $clean);

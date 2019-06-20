@@ -3,7 +3,7 @@
 /*
  * This file is part of Sulu.
  *
- * (c) MASSIVE ART WebServices GmbH
+ * (c) Sulu GmbH
  *
  * This source file is subject to the MIT license that is bundled
  * with this source code in the file LICENSE.
@@ -29,7 +29,7 @@ class Configuration implements ConfigurationInterface
             ->scalarNode('adapter')
                 ->defaultValue('auto')
                 ->validate()
-                    ->ifTrue(function ($v) {
+                    ->ifTrue(function($v) {
                         return !in_array($v, ['auto', 'gd', 'imagick', 'gmagick']);
                     })
                     ->thenInvalid('Invalid imagine adapted specified: %s')
@@ -118,7 +118,14 @@ class Configuration implements ConfigurationInterface
                         ])
                     ->end()
                     ->arrayNode('types')
-                        ->prototype('scalar')->end()->defaultValue([
+                        ->prototype('array')
+                            ->children()
+                                ->scalarNode('type')->cannotBeEmpty()->isRequired()->end()
+                                ->arrayNode('mimeTypes')->requiresAtLeastOneElement()
+                                    ->prototype('scalar')->end()
+                                ->end()
+                            ->end()
+                        ->end()->defaultValue([
                             [
                                 'type' => 'document',
                                 'mimeTypes' => ['*'],

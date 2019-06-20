@@ -3,7 +3,7 @@
 /*
  * This file is part of Sulu.
  *
- * (c) MASSIVE ART WebServices GmbH
+ * (c) Sulu GmbH
  *
  * This source file is subject to the MIT license that is bundled
  * with this source code in the file LICENSE.
@@ -370,8 +370,7 @@ class ContentRepositoryTest extends SuluTestCase
         $this->createPage('test-2', 'de');
         $this->createPage('test-3', 'de');
 
-        $result = $this->contentRepository->findByWebspaceRoot('de', 'sulu_io',
-            MappingBuilder::create()->getMapping());
+        $result = $this->contentRepository->findByWebspaceRoot('de', 'sulu_io', MappingBuilder::create()->getMapping());
 
         $this->assertCount(3, $result);
 
@@ -381,6 +380,21 @@ class ContentRepositoryTest extends SuluTestCase
         $this->assertEquals('/test-2', $result[1]->getPath());
         $this->assertNotNull($result[2]->getId());
         $this->assertEquals('/test-3', $result[2]->getPath());
+    }
+
+    public function testFindByWebspaceRootNonExistingLocale()
+    {
+        $this->createPage('test-1', 'de');
+
+        $result = $this->contentRepository->findByWebspaceRoot('fr', 'sulu_io', MappingBuilder::create()->getMapping());
+
+        $this->assertCount(1, $result);
+
+        $this->assertNotNull($result[0]->getId());
+        $this->assertEquals('/test-1', $result[0]->getPath());
+        $this->assertEquals('ghost', $result[0]->getLocalizationType()->getName());
+        $this->assertEquals('de', $result[0]->getLocalizationType()->getValue());
+        $this->assertEquals('fr', $result[0]->getLocale());
     }
 
     public function testFindByWebspaceRootMapping()
@@ -810,7 +824,7 @@ class ContentRepositoryTest extends SuluTestCase
         $this->assertCount(3, $result);
 
         $items = array_map(
-            function (Content $content) {
+            function(Content $content) {
                 return [
                     'uuid' => $content->getId(),
                     'hasChildren' => $content->hasChildren(),
@@ -842,7 +856,7 @@ class ContentRepositoryTest extends SuluTestCase
         $this->assertCount(2, $result);
 
         $items = array_map(
-            function (Content $content) {
+            function(Content $content) {
                 return [
                     'uuid' => $content->getId(),
                     'hasChildren' => $content->hasChildren(),
@@ -870,7 +884,7 @@ class ContentRepositoryTest extends SuluTestCase
         );
 
         $paths = array_map(
-            function (Content $content) {
+            function(Content $content) {
                 return $content->getPath();
             },
             $result
@@ -894,7 +908,7 @@ class ContentRepositoryTest extends SuluTestCase
         $this->assertCount(1, $result);
 
         $paths = array_map(
-            function (Content $content) {
+            function(Content $content) {
                 return $content->getPath();
             },
             $result
@@ -913,7 +927,7 @@ class ContentRepositoryTest extends SuluTestCase
             MappingBuilder::create()->setResolveUrl(true)->getMapping()
         );
 
-        usort($result, function ($content1, $content2) {
+        usort($result, function($content1, $content2) {
             return strcmp($content1->getPath(), $content2->getPath());
         });
 

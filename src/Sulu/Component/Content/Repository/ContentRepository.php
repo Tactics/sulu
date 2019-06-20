@@ -3,7 +3,7 @@
 /*
  * This file is part of Sulu.
  *
- * (c) MASSIVE ART WebServices GmbH
+ * (c) Sulu GmbH
  *
  * This source file is subject to the MIT license that is bundled
  * with this source code in the file LICENSE.
@@ -390,7 +390,7 @@ class ContentRepository implements ContentRepositoryInterface
         return array_values(
             array_filter(
                 array_map(
-                    function (Row $row) use ($mapping, $locale, $locales, $user) {
+                    function(Row $row) use ($mapping, $locale, $locales, $user) {
                         return $this->resolveContent($row, $locale, $locales, $mapping, $user);
                     },
                     iterator_to_array($queryBuilder->execute())
@@ -452,7 +452,7 @@ class ContentRepository implements ContentRepositoryInterface
         $webspace = $this->webspaceManager->findWebspaceByKey($webspaceKey);
 
         return array_map(
-            function (Localization $localization) {
+            function(Localization $localization) {
                 return $localization->getLocale();
             },
             $webspace->getAllLocalizations()
@@ -471,7 +471,7 @@ class ContentRepository implements ContentRepositoryInterface
         $portal = $this->webspaceManager->findPortalByKey($portalKey);
 
         return array_map(
-            function (Localization $localization) {
+            function(Localization $localization) {
                 return $localization->getLocale();
             },
             $portal->getLocalizations()
@@ -486,7 +486,7 @@ class ContentRepository implements ContentRepositoryInterface
     private function getLocales()
     {
         return array_map(
-            function (Localization $localization) {
+            function(Localization $localization) {
                 return $localization->getLocale();
             },
             $this->webspaceManager->getAllLocalizations()
@@ -592,11 +592,15 @@ class ContentRepository implements ContentRepositoryInterface
         $webspaceKey = $this->nodeHelper->extractWebspaceFromPath($row->getPath());
 
         $originalLocale = $locale;
+        $availableLocales = $this->resolveAvailableLocales($row);
         $ghostLocale = $this->localizationFinder->findAvailableLocale(
             $webspaceKey,
-            $this->resolveAvailableLocales($row),
+            $availableLocales,
             $locale
         );
+        if (null === $ghostLocale) {
+            $ghostLocale = reset($availableLocales);
+        }
 
         $type = null;
         if ($row->getValue('shadowOn')) {
@@ -655,7 +659,7 @@ class ContentRepository implements ContentRepositoryInterface
             $urls = [];
             array_walk(
                 $locales,
-                function ($item) use (&$urls, $row) {
+                function($item) use (&$urls, $row) {
                     $urls[$item] = $this->resolveUrl($row, $item);
                 }
             );
