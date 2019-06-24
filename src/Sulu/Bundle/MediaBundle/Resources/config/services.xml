@@ -313,5 +313,12 @@
 
             <tag name="console.command"/>
         </service>
+
+        <service id="App\EventListener\MediaUploadListener" class="Sulu\Bundle\MediaBundle\EventListener\MediaUploadListener">
+            <argument type="service" id="sulu_media.storage"/>
+
+            <tag name="doctrine.event_listener" event="prePersist"/>
+            <tag name="doctrine.event_listener" event="preUpdate"/>
+        </service>
     </services>
 </container>
