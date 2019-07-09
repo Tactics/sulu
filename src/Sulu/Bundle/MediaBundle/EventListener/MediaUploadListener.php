@@ -65,9 +65,9 @@ class MediaUploadListener
                 $newwidth = $w;
             }
         }
-        $src = imagecreatefromjpeg($file);
-        $dst = imagecreatetruecolor($newwidth, $newheight);
-        imagecopyresampled($dst, $src, 0, 0, 0, 0, $newwidth, $newheight, $width, $height);
+        $src = \imagecreatefromjpeg($file);
+        $dst = \imagecreatetruecolor($newwidth, $newheight);
+        \imagecopyresampled($dst, $src, 0, 0, 0, 0, $newwidth, $newheight, $width, $height);
 
         return $dst;
     }
